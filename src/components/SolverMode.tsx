@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Play, Loader, Download, Plus, Minus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Upload, Menu } from 'lucide-react';
-import { solveCryptarithm } from '../utils/cryptarithmSolver';
+import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
+import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface SolverModeProps {
   onBack: () => void;
@@ -62,16 +63,54 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     setSolutions([]);
     setCurrentSolutionIndex(0);
 
-    setTimeout(() => {
-      const result = solveCryptarithm(equation);
+    try {
+      const response = await solveCryptarithmAPI({
+        cryptarithm: equation,
+        solverType: 'SCALAR',
+        solutionLimit: 0, // Get all solutions
+        timeLimit: 0, // No time limit
+        arithmeticBase: 10,
+      });
 
-      if (result.solutions.length > 0) {
-        setSolutions(result.solutions);
+      if (response.success && response.solutions.length > 0) {
+        // Convert API solutions to the format expected by the UI
+        const convertedSolutions = response.solutions.map(sol => {
+          const assignment: Record<string, number> = {};
+
+          if (sol.assignment.includes('\n')) {
+            // New format: two lines with pipes
+            // Line 1:  S| E| N| D| ...
+            // Line 2:  9| 5| 6| 7| ...
+            const lines = sol.assignment.split('\n');
+            if (lines.length >= 2) {
+              const keys = lines[0].split('|').map(s => s.trim()).filter(s => s);
+              const values = lines[1].split('|').map(s => s.trim()).filter(s => s);
+              keys.forEach((key, i) => {
+                if (values[i] !== undefined) {
+                  assignment[key.toUpperCase()] = parseInt(values[i], 10);
+                }
+              });
+            }
+          } else if (sol.assignment.includes('=')) {
+            // Old format: "s=9, e=5, n=6, d=7, m=1, o=0, r=8, y=2"
+            sol.assignment.split(',').forEach(pair => {
+              const [letter, digit] = pair.trim().split('=');
+              if (letter && digit) {
+                assignment[letter.toUpperCase()] = parseInt(digit, 10);
+              }
+            });
+          }
+          return assignment;
+        });
+        setSolutions(convertedSolutions);
       } else {
-        setError('Aucune solution trouvée pour ce cryptarithme');
+        setError(response.error || 'Aucune solution trouvée pour ce cryptarithme');
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la résolution');
+    } finally {
       setSolving(false);
-    }, 1000);
+    }
   };
 
   const handleExport = () => {
@@ -166,16 +205,7 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         {/* Main Container */}
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
           {/* Back Button - Mobile only */}
-          {isMobile && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 mb-8 text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-              aria-label="Retour"
-            >
-              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-              <span className="text-[14px] font-medium">Retour</span>
-            </button>
-          )}
+          {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
           {/* Header */}
           <div className="mb-10">

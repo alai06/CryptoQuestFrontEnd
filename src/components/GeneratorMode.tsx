@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, Wand2, Plus, Minus, X, Download, Grid3x3, Trash2, AlertCircle, Menu } from 'lucide-react';
-import { generateCryptarithm } from '../utils/cryptarithmSolver';
+import { ArrowLeft, Wand2, Plus, Minus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
+import { generateCryptarithms as generateCryptarithmsAPI } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
+import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface GeneratorModeProps {
   onBack: () => void;
@@ -26,28 +27,56 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [customWordsText, setCustomWordsText] = useState<string>('');
   const [showLimitWarning, setShowLimitWarning] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
 
   const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (generated.length >= MAX_CRYPTARITHMS) {
       setShowLimitWarning(true);
       setTimeout(() => setShowLimitWarning(false), 5000);
       return;
     }
 
-    const equation = generateCryptarithm(operation, numTerms, difficulty, customWords.length > 0 ? customWords : undefined);
-    const newCryptarithm: GeneratedCryptarithm = {
-      id: Date.now().toString(),
-      equation,
-      timestamp: new Date(),
-    };
-    setGenerated([newCryptarithm, ...generated]);
-    setSelectedCryptarithm(equation);
+    if (customWords.length === 0) {
+      setError('Veuillez ajouter au moins un mot personnalisé');
+      return;
+    }
 
-    if (onCryptarithmGenerated) {
-      onCryptarithmGenerated(equation, {});
+    setGenerating(true);
+    setError('');
+
+    try {
+      const response = await generateCryptarithmsAPI({
+        words: customWords,
+        operatorSymbol: '+',
+        solutionLimit: 5,
+        timeLimit: 60,
+      });
+
+      if (response.success && response.cryptarithms.length > 0) {
+        // Add all generated cryptarithms to the list
+        const newCryptarithms: GeneratedCryptarithm[] = response.cryptarithms.map(crypto => ({
+          id: Date.now().toString() + Math.random(),
+          equation: crypto.cryptarithm,
+          timestamp: new Date(),
+        }));
+
+        setGenerated([...newCryptarithms, ...generated]);
+        setSelectedCryptarithm(newCryptarithms[0].equation);
+
+        if (onCryptarithmGenerated && newCryptarithms.length > 0) {
+          onCryptarithmGenerated(newCryptarithms[0].equation, {});
+        }
+      } else {
+        setError(response.error || 'Aucun cryptarithme généré');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -211,16 +240,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         {/* Configuration Panel */}
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
           {/* Back Button - Mobile only */}
-          {isMobile && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 mb-8 text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-              aria-label="Retour"
-            >
-              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-              <span className="text-[14px] font-medium">Retour</span>
-            </button>
-          )}
+          {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
           <div className="flex items-center gap-3 mb-8">
             <div className="p-2 bg-[#0096BC] rounded-[12px]">
@@ -347,12 +367,31 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
                 Actions
               </label>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-3 p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-[#FF3B30] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                  <p className="text-[#FF3B30] text-[13px]">{error}</p>
+                </div>
+              )}
+
               <button
                 onClick={handleGenerate}
-                className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium"
+                disabled={generating}
+                className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Wand2 className="w-5 h-5" strokeWidth={1.5} />
-                Générer
+                {generating ? (
+                  <>
+                    <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                    Génération en cours...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-5 h-5" strokeWidth={1.5} />
+                    Générer
+                  </>
+                )}
               </button>
 
               {generated.length > 0 && (
@@ -397,24 +436,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           </div>
         )}
 
-        {/* Add Custom Words */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[20px] font-semibold tracking-[-0.01em]">Ajouter des mots personnalisés</h3>
-          </div>
-          <textarea
-            value={customWordsText}
-            onChange={(e) => handleCustomWordsTextChange(e.target.value)}
-            className="w-full h-24 px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] text-[14px] resize-y"
-            placeholder="Un mot par ligne (1-10 lettres)"
-          />
-          <button
-            onClick={handleAddCustomWords}
-            className="w-full py-2 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mt-2 font-medium"
-          >
-            Ajouter
-          </button>
-        </div>
 
         {/* Generated List */}
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">

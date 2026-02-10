@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Trophy, Star, Target, Award, Medal, Crown, Menu } from 'lucide-react';
+import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface ProgressDashboardProps {
   onBack: () => void;
@@ -104,16 +105,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
         {/* Main Stats Card */}
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
           {/* Back Button - Mobile only */}
-          {isMobile && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 mb-8 text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-              aria-label="Retour"
-            >
-              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
-              <span className="text-[14px] font-medium">Retour</span>
-            </button>
-          )}
+          {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
           <h1 className="text-[32px] font-bold mb-8 tracking-[-0.02em]">Votre Progression</h1>
 
