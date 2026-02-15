@@ -30,8 +30,9 @@ export default function VerticalCryptarithm({ equation, size = 'medium' }: Verti
     // Standard equation format
     const [left, result] = equation.split('=').map(s => s.trim());
     
-    if (left.includes('×')) {
-      const terms = left.split('×').map(s => s.trim());
+    // Accept both × and * for multiplication
+    if (left.includes('×') || left.includes('*')) {
+      const terms = left.split(/[×*]/).map(s => s.trim());
       return {
         type: 'multiplication',
         terms,

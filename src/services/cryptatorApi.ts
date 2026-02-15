@@ -8,6 +8,10 @@ const API_BASE_URL = 'http://localhost:8090/api/v1';
 
 // ==================== Type Definitions ====================
 
+// Types acceptés par le backend
+export type SolverType = 'SCALAR' | 'BIGNUM' | 'CRYPT' | 'ADAPT' | 'ADAPTC';
+export type RightMemberType = 'FREE' | 'UNIQUE' | 'FIXED';
+
 export interface Solution {
     assignment: string;
     evaluation: string;
@@ -16,7 +20,7 @@ export interface Solution {
 
 export interface SolveRequest {
     cryptarithm: string;
-    solverType?: string;
+    solverType?: SolverType;
     solutionLimit?: number;
     timeLimit?: number;
     arithmeticBase?: number;
@@ -53,12 +57,13 @@ export interface GenerateRequest {
     lowerBound?: number;
     upperBound?: number;
     dryRun?: boolean;
-    rightMemberType?: string;
+    rightMemberType?: RightMemberType;
     minWords?: number;
     maxWords?: number;
     lightPropagation?: boolean;
     threads?: number;
     crossGridSize?: number;
+    allowLeadingZeros?: boolean;
 }
 
 export interface GenerateResponse {
@@ -145,6 +150,7 @@ export async function generateCryptarithms(request: GenerateRequest): Promise<Ge
                 lightPropagation: request.lightPropagation ?? false,
                 threads: request.threads ?? 1,
                 crossGridSize: request.crossGridSize,
+                allowLeadingZeros: request.allowLeadingZeros ?? false,
             }),
         });
 

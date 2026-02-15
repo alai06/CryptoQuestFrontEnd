@@ -273,6 +273,65 @@ export function solveCryptarithm(equation: string): SolverResult {
   return { solution: null, solutions: [], steps: [...steps, 'Aucune solution trouvée'] };
 }
 
+/**
+ * Validate if a given assignment satisfies the cryptarithm equation
+ * @param equation - The cryptarithm equation (e.g., "A + A = B")
+ * @param assignments - The letter-to-digit assignments (e.g., { A: '1', B: '2' })
+ * @returns true if the equation is mathematically correct with the given assignments
+ */
+export function validateSolution(equation: string, assignments: Record<string, string>): boolean {
+  // Parse equation
+  const parts = equation.replace(/\s/g, '').split(/[+=]/);
+  const operands = parts.slice(0, -1);
+  const result = parts[parts.length - 1];
+
+  // Convert assignments to numbers
+  const numAssignments: Record<string, number> = {};
+  for (const [letter, digit] of Object.entries(assignments)) {
+    numAssignments[letter] = Number(digit);
+  }
+
+  // Get all letters
+  const allLetters = Array.from(new Set(equation.match(/[A-Z]/g) || []));
+
+  // Check if all letters are assigned
+  for (const letter of allLetters) {
+    if (numAssignments[letter] === undefined) {
+      return false; // Not all letters assigned
+    }
+  }
+
+  // Check for duplicate digits
+  const usedDigits = new Set(Object.values(numAssignments));
+  if (usedDigits.size !== Object.keys(numAssignments).length) {
+    return false; // Duplicate digits used
+  }
+
+  // Check leading zeros
+  const allWords = [...operands, result];
+  for (const word of allWords) {
+    if (word.length > 1 && numAssignments[word[0]] === 0) {
+      return false; // Leading zero not allowed
+    }
+  }
+
+  // Evaluate function
+  function evaluate(word: string): number {
+    let value = 0;
+    for (const char of word) {
+      if (numAssignments[char] === undefined) return -1;
+      value = value * 10 + numAssignments[char];
+    }
+    return value;
+  }
+
+  // Calculate sum and verify
+  const sum = operands.reduce((acc, operand) => acc + evaluate(operand), 0);
+  const resultValue = evaluate(result);
+
+  return sum === resultValue;
+}
+
 export function generateCryptarithm(
   operation: 'addition' | 'subtraction' | 'multiplication' | 'crossed' | 'long-multiplication',
   numTerms: number,

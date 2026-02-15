@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Wand2, Plus, Minus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
 import { generateCryptarithms as generateCryptarithmsAPI } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
 import BackButtonWithProgress from './BackButtonWithProgress';
+import { SelectField, NumberInput, CheckboxField } from './FormComponents';
+import SolutionDisplay from './SolutionDisplay';
 
 interface GeneratorModeProps {
   onBack: () => void;
@@ -15,6 +17,7 @@ interface GeneratorModeProps {
 interface GeneratedCryptarithm {
   id: string;
   equation: string;
+  solution: string;
   timestamp: Date;
 }
 
@@ -23,15 +26,41 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [numTerms, setNumTerms] = useState(2);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [generated, setGenerated] = useState<GeneratedCryptarithm[]>([]);
-  const [selectedCryptarithm, setSelectedCryptarithm] = useState<string | null>(null);
+  const [selectedCryptarithm, setSelectedCryptarithm] = useState<GeneratedCryptarithm | null>(null);
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [customWordsText, setCustomWordsText] = useState<string>('');
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  
+  // Advanced API options
+  const [solutionLimit, setSolutionLimit] = useState<number>(5);
+  const [timeLimit, setTimeLimit] = useState<number>(60);
+  const [shuffle, setShuffle] = useState<boolean>(false);
+  const [allowLeadingZeros, setAllowLeadingZeros] = useState<boolean>(false);
+  const [rightMemberType, setRightMemberType] = useState<'UNIQUE' | 'FREE' | 'FIXED'>('UNIQUE');
+  const [minWords, setMinWords] = useState<number | undefined>(undefined);
+  const [maxWords, setMaxWords] = useState<number | undefined>(undefined);
+  const [lowerBound, setLowerBound] = useState<number | undefined>(undefined);
+  const [upperBound, setUpperBound] = useState<number | undefined>(undefined);
+  const [threads, setThreads] = useState<number>(1);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+  const [crossGridSize, setCrossGridSize] = useState<number | undefined>(undefined);
 
   const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
+
+  // Synchroniser le symbole d'opération avec le type d'opération sélectionné
+  const getOperatorSymbol = (): string => {
+    switch (operation) {
+      case 'addition': return '+';
+      case 'subtraction': return '-';
+      case 'multiplication': return '*';
+      case 'crossed': return 'CROSS';
+      case 'long-multiplication': return 'LMUL';
+      default: return '+';
+    }
+  };
 
   const handleGenerate = async () => {
     if (generated.length >= MAX_CRYPTARITHMS) {
@@ -51,9 +80,18 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     try {
       const response = await generateCryptarithmsAPI({
         words: customWords,
-        operatorSymbol: '+',
-        solutionLimit: 5,
-        timeLimit: 60,
+        operatorSymbol: getOperatorSymbol(),
+        solutionLimit: solutionLimit,
+        timeLimit: timeLimit,
+        shuffle: shuffle,
+        rightMemberType: rightMemberType,
+        minWords: minWords,
+        maxWords: maxWords,
+        lowerBound: lowerBound,
+        upperBound: upperBound,
+        threads: threads,
+        allowLeadingZeros: allowLeadingZeros,
+        crossGridSize: crossGridSize,
       });
 
       if (response.success && response.cryptarithms.length > 0) {
@@ -61,11 +99,12 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         const newCryptarithms: GeneratedCryptarithm[] = response.cryptarithms.map(crypto => ({
           id: Date.now().toString() + Math.random(),
           equation: crypto.cryptarithm,
+          solution: crypto.solution,
           timestamp: new Date(),
         }));
 
         setGenerated([...newCryptarithms, ...generated]);
-        setSelectedCryptarithm(newCryptarithms[0].equation);
+        setSelectedCryptarithm(newCryptarithms[0]);
 
         if (onCryptarithmGenerated && newCryptarithms.length > 0) {
           onCryptarithmGenerated(newCryptarithms[0].equation, {});
@@ -84,6 +123,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     const exportData = {
       cryptarithms: generated.map(c => ({
         equation: c.equation,
+        solution: c.solution,
         timestamp: c.timestamp,
       })),
       generatedAt: new Date().toISOString(),
@@ -98,9 +138,10 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     URL.revokeObjectURL(url);
   };
 
-  const handleExportSingle = (equation: string) => {
+  const handleExportSingle = (crypto: GeneratedCryptarithm) => {
     const exportData = {
-      equation,
+      equation: crypto.equation,
+      solution: crypto.solution,
       timestamp: new Date().toISOString(),
     };
 
@@ -123,6 +164,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           const importedCryptarithms: GeneratedCryptarithm[] = data.cryptarithms.map((c: any) => ({
             id: Date.now().toString(),
             equation: c.equation,
+            solution: c.solution || '',
             timestamp: new Date(c.timestamp),
           }));
           setGenerated([...importedCryptarithms, ...generated]);
@@ -134,7 +176,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
   const handleDelete = (id: string) => {
     setGenerated(generated.filter(c => c.id !== id));
-    if (selectedCryptarithm && generated.find(c => c.id === id)?.equation === selectedCryptarithm) {
+    if (selectedCryptarithm && selectedCryptarithm.id === id) {
       setSelectedCryptarithm(null);
     }
   };
@@ -405,6 +447,153 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               )}
             </div>
           </div>
+
+          {/* Advanced Options Section */}
+          <div className="mt-6 border-t border-[#E5E5E5] pt-6">
+            <button
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-[#F5F5F7] hover:bg-[#E5E5E5] rounded-[12px] transition-all mb-4"
+            >
+              <span className="text-[16px] font-semibold text-[#1D1D1F]">
+                Options avancées de l'API
+              </span>
+              <span className="text-[14px] text-[#86868B]">
+                {showAdvancedOptions ? '▼' : '▶'}
+              </span>
+            </button>
+
+            {showAdvancedOptions && (
+              <div className="p-4 bg-[#FAFAFA] rounded-[12px]">
+                {/* Info sur le symbole d'opération */}
+                <div className="mb-6 p-3 bg-[#E8F7FB] border border-[#0096BC]/30 rounded-[12px]">
+                  <p className="text-[13px] text-[#1D1D1F]">
+                    <strong>Opération sélectionnée :</strong>{' '}
+                    {operation === 'addition' ? 'Addition (+)' :
+                     operation === 'subtraction' ? 'Soustraction (-)' :
+                     operation === 'multiplication' ? 'Multiplication (*)' :
+                     operation === 'crossed' ? 'Opération croisée (CROSS)' :
+                     operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}
+                  </p>
+                  <p className="text-[12px] text-[#86868B] mt-1">
+                    Le type d'opération est défini par votre sélection dans les paramètres de base ci-dessus
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Solution Limit */}
+                  <NumberInput
+                    label="Limite de solutions"
+                    value={solutionLimit}
+                    onChange={(val) => setSolutionLimit(val ?? 5)}
+                    min={1}
+                    max={100}
+                  />
+
+                  {/* Time Limit */}
+                  <NumberInput
+                    label="Temps limite (secondes)"
+                    value={timeLimit}
+                    onChange={(val) => setTimeLimit(val ?? 60)}
+                    min={1}
+                    max={300}
+                  />
+
+                  {/* Right Member Type */}
+                  <SelectField
+                    label="Type de membre droit"
+                    value={rightMemberType}
+                    onChange={(val) => setRightMemberType(val as 'UNIQUE' | 'FREE' | 'FIXED')}
+                    options={[
+                      { value: 'UNIQUE', label: 'UNIQUE (Différent des membres gauches)' },
+                      { value: 'FREE', label: 'FREE (Aucune contrainte)' },
+                      { value: 'FIXED', label: 'FIXED (Membre droit fixe)' },
+                    ]}
+                  />
+
+                  {/* Min Words */}
+                  <NumberInput
+                    label="Mots minimum"
+                    value={minWords}
+                    onChange={setMinWords}
+                    min={1}
+                    placeholder="Non défini"
+                    allowUndefined={true}
+                    helpText="Optionnel"
+                  />
+
+                  {/* Max Words */}
+                  <NumberInput
+                    label="Mots maximum"
+                    value={maxWords}
+                    onChange={setMaxWords}
+                    min={1}
+                    placeholder="Non défini"
+                    allowUndefined={true}
+                    helpText="Optionnel"
+                  />
+
+                  {/* Lower Bound */}
+                  <NumberInput
+                    label="Borne inférieure"
+                    value={lowerBound}
+                    onChange={setLowerBound}
+                    placeholder="Non défini"
+                    allowUndefined={true}
+                    helpText="Optionnel"
+                  />
+
+                  {/* Upper Bound */}
+                  <NumberInput
+                    label="Borne supérieure"
+                    value={upperBound}
+                    onChange={setUpperBound}
+                    placeholder="Non défini"
+                    allowUndefined={true}
+                    helpText="Optionnel"
+                  />
+
+                  {/* Threads */}
+                  <NumberInput
+                    label="Threads"
+                    value={threads}
+                    onChange={(val) => setThreads(val ?? 1)}
+                    min={1}
+                    max={16}
+                  />
+
+                  {/* Cross Grid Size (visible uniquement pour CROSS) */}
+                  {operation === 'crossed' && (
+                    <NumberInput
+                      label="Taille de la grille (CROSS)"
+                      value={crossGridSize}
+                      onChange={setCrossGridSize}
+                      min={2}
+                      max={10}
+                      placeholder="Non défini"
+                      allowUndefined={true}
+                      helpText="Taille de la grille pour les opérations croisées"
+                    />
+                  )}
+
+                  {/* Shuffle */}
+                  <CheckboxField
+                    id="shuffle"
+                    label="Mélanger les mots"
+                    checked={shuffle}
+                    onChange={setShuffle}
+                  />
+
+                  {/* Allow Leading Zeros */}
+                  <CheckboxField
+                    id="allowLeadingZeros"
+                    label="Autoriser les zéros en début de mot"
+                    checked={allowLeadingZeros}
+                    onChange={setAllowLeadingZeros}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Custom Words Display */}
@@ -458,12 +647,12 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                   key={crypto.id}
                   className={`
                     p-4 rounded-[12px] border transition-all cursor-pointer
-                    ${selectedCryptarithm === crypto.equation
+                    ${selectedCryptarithm?.id === crypto.id
                       ? 'border-[#0096BC] bg-[#E8F7FB]'
                       : 'border-[#E5E5E5] hover:border-[#0096BC] bg-white'
                     }
                   `}
-                  onClick={() => setSelectedCryptarithm(crypto.equation)}
+                  onClick={() => setSelectedCryptarithm(crypto)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -478,7 +667,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleExportSingle(crypto.equation);
+                          handleExportSingle(crypto);
                         }}
                         className="p-2 text-[#86868B] hover:text-[#0096BC] hover:bg-[#E8F7FB] rounded-[12px] transition-all"
                       >
@@ -501,17 +690,39 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           )}
 
           {selectedCryptarithm && (
-            <div className="mt-6 p-8 bg-[#F5F5F7] rounded-[12px]">
-              <h3 className="text-[20px] font-semibold mb-6 text-center tracking-[-0.01em]">Cryptarithme sélectionné</h3>
-              <div className="flex justify-center mb-6">
-                <div className="bg-white rounded-[12px] p-8 border border-[#E5E5E5]">
-                  {selectedCryptarithm.includes('|') ? (
-                    <CrossedCryptarithm equation={selectedCryptarithm} size="large" />
-                  ) : (
-                    <VerticalCryptarithm equation={selectedCryptarithm} size="large" />
-                  )}
+            <div className="mt-6 space-y-6">
+              <div className="p-8 bg-[#F5F5F7] rounded-[12px]">
+                <h3 className="text-[20px] font-semibold mb-6 text-center tracking-[-0.01em]">Cryptarithme sélectionné</h3>
+                <div className="flex justify-center mb-6">
+                  <div className="bg-white rounded-[12px] p-8 border border-[#E5E5E5]">
+                    {(() => {
+                      const equation = selectedCryptarithm.equation;
+                      // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
+                      if (equation.includes('&&')) {
+                        // Format CROSS: "AN + ODE = TUT && TA + TEL = SUT && ..."
+                        // Prendre les 3 premières équations et les joindre avec |
+                        const equations = equation.split('&&').map(eq => eq.trim());
+                        const crossEquation = equations.slice(0, 3).join(' | ');
+                        return <CrossedCryptarithm equation={crossEquation} size="large" />;
+                      } else if (equation.includes('|')) {
+                        return <CrossedCryptarithm equation={equation} size="large" />;
+                      } else {
+                        return <VerticalCryptarithm equation={equation} size="large" />;
+                      }
+                    })()}
+                  </div>
                 </div>
               </div>
+              
+              {/* Affichage de la solution */}
+              <div className="p-8 bg-white rounded-[12px] border border-[#E5E5E5]">
+                <h3 className="text-[20px] font-semibold mb-6 tracking-[-0.01em]">Solution</h3>
+                <SolutionDisplay 
+                  solution={selectedCryptarithm.solution} 
+                  equation={selectedCryptarithm.equation}
+                />
+              </div>
+              
               <p className="text-[#86868B] text-center text-[14px]">
                 Vous pouvez maintenant résoudre ce cryptarithme dans le mode Résolution ou l'exporter
               </p>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Play, Loader, Download, Plus, Minus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Upload, Menu } from 'lucide-react';
 import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
+import { SelectField, NumberInput, CheckboxField } from './FormComponents';
 
 interface SolverModeProps {
   onBack: () => void;
@@ -27,19 +28,19 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
     'HAPPY - SAD = JOY',
   ],
   multiplication: [
-    'AB × C = DEF',
-    'TWO × TWO = FOUR',
-    'AB × CD = EFGH',
+    'AB * C = DEF',
+    'TWO * TWO = FOUR',
+    'AB * CD = EFGH',
   ],
   crossed: [
-    'A + B = C | D + E = F | G + H = I',
-    'AB + CD = EF | GH + IJ = KL | MN + OP = QR',
-    'ABC + DEF = GHI | JKL + MNO = PQR',
+    'A + B = C && D + E = F && G + H = I',
+    'AB + CD = EF && GH + IJ = KL && MN + OP = QR',
+    'ABC + DEF = GHI && JKL + MNO = PQR',
   ],
   'long-multiplication': [
-    'AB × CD | EFG + HIJ = KLMN',
-    'ABC × DE | FGHI + JKLM = NOPQR',
-    'AB × CD | EF + GHI = JKLM',
+    'AB * CD && EFG + HIJ = KLMN',
+    'ABC * DE && FGHI + JKLM = NOPQR',
+    'AB * CD && EF + GHI = JKLM',
   ],
   generated: [],
 };
@@ -51,6 +52,15 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   const [currentSolutionIndex, setCurrentSolutionIndex] = useState(0);
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<OperationType>('addition');
+  
+  // Advanced API options
+  const [solverType, setSolverType] = useState<'SCALAR' | 'BIGNUM' | 'CRYPT' | 'ADAPT' | 'ADAPTC'>('SCALAR');
+  const [solutionLimit, setSolutionLimit] = useState<number>(0);
+  const [timeLimit, setTimeLimit] = useState<number>(0);
+  const [arithmeticBase, setArithmeticBase] = useState<number>(10);
+  const [allowLeadingZeros, setAllowLeadingZeros] = useState<boolean>(false);
+  const [hornerScheme, setHornerScheme] = useState<boolean>(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
   const handleSolve = async () => {
     if (!equation.trim()) {
@@ -66,10 +76,12 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     try {
       const response = await solveCryptarithmAPI({
         cryptarithm: equation,
-        solverType: 'SCALAR',
-        solutionLimit: 0, // Get all solutions
-        timeLimit: 0, // No time limit
-        arithmeticBase: 10,
+        solverType: solverType,
+        solutionLimit: solutionLimit,
+        timeLimit: timeLimit,
+        arithmeticBase: arithmeticBase,
+        allowLeadingZeros: allowLeadingZeros,
+        hornerScheme: hornerScheme,
       });
 
       if (response.success && response.solutions.length > 0) {
@@ -295,6 +307,85 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                 ))
               )}
             </div>
+          </div>
+
+          {/* Advanced Options Section */}
+          <div className="mb-8 border-t border-[#E5E5E5] pt-6">
+            <button
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-[#F5F5F7] hover:bg-[#E5E5E5] rounded-[12px] transition-all mb-4"
+            >
+              <span className="text-[16px] font-semibold text-[#1D1D1F]">
+                Options avancées du solver
+              </span>
+              <span className="text-[14px] text-[#86868B]">
+                {showAdvancedOptions ? '▼' : '▶'}
+              </span>
+            </button>
+
+            {showAdvancedOptions && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 bg-[#FAFAFA] rounded-[12px]">
+                {/* Solver Type */}
+                <SelectField
+                  label="Type de solver"
+                  value={solverType}
+                  onChange={(val) => setSolverType(val as 'SCALAR' | 'BIGNUM' | 'CRYPT' | 'ADAPT' | 'ADAPTC')}
+                  options={[
+                    { value: 'SCALAR', label: 'SCALAR (Standard)' },
+                    { value: 'BIGNUM', label: 'BIGNUM (Grands nombres)' },
+                    { value: 'CRYPT', label: 'CRYPT (Spécialisé)' },
+                    { value: 'ADAPT', label: 'ADAPT (Adaptatif)' },
+                    { value: 'ADAPTC', label: 'ADAPTC (Adaptatif avancé)' },
+                  ]}
+                />
+
+                {/* Solution Limit */}
+                <NumberInput
+                  label="Limite de solutions"
+                  value={solutionLimit}
+                  onChange={(val) => setSolutionLimit(val ?? 0)}
+                  min={0}
+                  max={1000}
+                  helpText="0 = toutes les solutions"
+                />
+
+                {/* Time Limit */}
+                <NumberInput
+                  label="Temps limite (secondes)"
+                  value={timeLimit}
+                  onChange={(val) => setTimeLimit(val ?? 0)}
+                  min={0}
+                  max={300}
+                  helpText="0 = pas de limite"
+                />
+
+                {/* Arithmetic Base */}
+                <NumberInput
+                  label="Base arithmétique"
+                  value={arithmeticBase}
+                  onChange={(val) => setArithmeticBase(val ?? 10)}
+                  min={2}
+                  max={36}
+                  helpText="Par défaut : 10 (décimal)"
+                />
+
+                {/* Allow Leading Zeros */}
+                <CheckboxField
+                  id="solver-allowLeadingZeros"
+                  label="Autoriser les zéros en début de mot"
+                  checked={allowLeadingZeros}
+                  onChange={setAllowLeadingZeros}
+                />
+
+                {/* Horner Scheme */}
+                <CheckboxField
+                  id="hornerScheme"
+                  label="Utiliser le schéma de Horner"
+                  checked={hornerScheme}
+                  onChange={setHornerScheme}
+                />
+              </div>
+            )}
           </div>
 
           {/* Solve Button */}

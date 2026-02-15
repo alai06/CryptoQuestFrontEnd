@@ -8,8 +8,8 @@ export default function CrossedCryptarithm({ equation, size = 'medium' }: Crosse
   const gap = size === 'small' ? 'gap-1' : size === 'medium' ? 'gap-2' : 'gap-3';
   const operatorSize = size === 'small' ? 'text-lg' : size === 'medium' ? 'text-xl' : 'text-2xl';
 
-  // Parse equation format: "A + B = C | D + E = F | G + H = I"
-  const equations = equation.split('|').map(eq => eq.trim());
+  // Parse equation format: "A + B = C | D + E = F | G + H = I" or "A + B = C && D + E = F && G + H = I"
+  const equations = equation.split(/\s*(?:\||&&)\s*/);
   
   if (equations.length !== 3) {
     return <div className="text-red-600">Format invalide pour une grille croisée</div>;
@@ -89,11 +89,15 @@ export default function CrossedCryptarithm({ equation, size = 'medium' }: Crosse
         <div className={`${cellSize} flex items-center justify-center bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-lg shadow-md border-2 border-emerald-300`}>
           <span className="text-emerald-800">{rows[2].term1}</span>
         </div>
-        <div className={`${cellSize}`}></div>
+        <div className={`${cellSize} flex items-center justify-center text-purple-600`}>
+          <span className={operatorSize}>+</span>
+        </div>
         <div className={`${cellSize} flex items-center justify-center bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-lg shadow-md border-2 border-emerald-300`}>
           <span className="text-emerald-800">{rows[2].term2}</span>
         </div>
-        <div className={`${cellSize}`}></div>
+        <div className={`${cellSize} flex items-center justify-center text-purple-600`}>
+          <span className={operatorSize}>=</span>
+        </div>
         <div className={`${cellSize} flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-200 rounded-lg shadow-md border-2 border-amber-300`}>
           <span className="text-amber-800">{rows[2].result}</span>
         </div>

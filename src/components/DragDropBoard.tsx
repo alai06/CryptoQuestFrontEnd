@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Check, X, RotateCcw, Lightbulb, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState } from '../utils/cryptarithmSolver';
+import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
 
 interface DragDropBoardProps {
   equation: string;
-  solution: Record<string, string>;
+  solution?: Record<string, string>; // Make solution optional
   onSolved?: () => void;
   showHints?: boolean;
   easyMode?: boolean;
@@ -76,7 +76,8 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
       return;
     }
 
-    const isCorrect = letters.every(letter => assignments[letter] === solution[letter]);
+    // Use mathematical validation instead of comparing with hardcoded solution
+    const isCorrect = validateSolution(equation, assignments);
     
     if (isCorrect) {
       setFeedback('correct');
@@ -266,6 +267,13 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
     const newAssignments = { ...assignments };
     let correctCount = 0;
     let incorrectCount = 0;
+
+    // Only verify individual letters if solution is provided
+    if (!solution) {
+      setHintMessage('Mode vérification désactivé : aucune solution de référence fournie');
+      setTimeout(() => setHintMessage(null), 3000);
+      return;
+    }
 
     // Check each assignment
     Object.entries(assignments).forEach(([letter, digit]) => {

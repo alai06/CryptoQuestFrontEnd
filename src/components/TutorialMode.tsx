@@ -25,9 +25,8 @@ const tutorialSteps = [
   },
   {
     title: 'Essayez vous-même',
-    description: 'Glissez-déposez les chiffres sur les lettres pour résoudre ce cryptarithme simple.',
+    description: 'Glissez-déposez les chiffres sur les lettres pour résoudre ce cryptarithme simple. (Plusieurs solutions sont possibles : A=1 et B=2, ou A=2 et B=4, ou A=3 et B=6, etc.)',
     example: 'A + A = B',
-    solution: { A: '1', B: '2' },
     interactive: true,
   },
 ];
@@ -114,10 +113,9 @@ export default function TutorialMode({ onComplete, onBack, isMobile = false, onO
 
           {/* Content */}
           <div className="mb-10">
-            {step.interactive && step.solution ? (
+            {step.interactive ? (
               <DragDropBoard
                 equation={step.example}
-                solution={step.solution}
                 onSolved={handleStepComplete}
               />
             ) : (
