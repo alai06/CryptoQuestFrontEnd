@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Play, Loader, Download, Plus, Minus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Upload, Menu } from 'lucide-react';
+import { ArrowLeft, Play, Loader, Download, Plus, Minus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
@@ -143,58 +143,6 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.txt';
-
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const content = event.target?.result as string;
-
-          // Check file extension
-          if (file.name.endsWith('.json')) {
-            const data = JSON.parse(content);
-
-            // Check if it's a valid cryptarithm JSON
-            if (data.equation) {
-              setEquation(data.equation);
-              setError('');
-              // Reset solutions
-              setSolutions([]);
-              setCurrentSolutionIndex(0);
-            } else {
-              setError('Format JSON invalide : "equation" manquant');
-            }
-          } else if (file.name.endsWith('.txt')) {
-            // For .txt files, just take the first non-empty line as the equation
-            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-            if (lines.length > 0) {
-              setEquation(lines[0].toUpperCase());
-              setError('');
-              // Reset solutions
-              setSolutions([]);
-              setCurrentSolutionIndex(0);
-            } else {
-              setError('Fichier TXT vide');
-            }
-          }
-        } catch (err) {
-          setError('Erreur lors de la lecture du fichier');
-        }
-      };
-
-      reader.readAsText(file);
-    };
-
-    input.click();
-  };
-
   const renderEquationWithSolution = (solution: Record<string, number>) => {
     return equation.split('').map((char, index) => {
       if (/[A-Z]/.test(char) && solution[char] !== undefined) {
@@ -229,18 +177,9 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
 
           {/* Input Section */}
           <div className="mb-8">
-            <div className="flex items-end gap-3 mb-3">
-              <label className="flex-1 text-[14px] font-medium text-[#1D1D1F]">
-                Équation du cryptarithme
-              </label>
-              <button
-                onClick={handleImport}
-                className="flex items-center gap-2 px-3 py-1.5 border border-[#0096BC] text-[#0096BC] rounded-[8px] hover:bg-[#E8F7FB] transition-colors text-[13px] font-medium"
-              >
-                <Upload className="w-4 h-4" strokeWidth={1.5} />
-                <span>Importer (.json, .txt)</span>
-              </button>
-            </div>
+            <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+              Équation du cryptarithme
+            </label>
             <input
               type="text"
               value={equation}

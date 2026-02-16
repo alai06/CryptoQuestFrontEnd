@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Wand2, Plus, Minus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
+import { ArrowLeft, Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
 import { generateCryptarithms as generateCryptarithmsAPI } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
@@ -22,9 +22,7 @@ interface GeneratedCryptarithm {
 }
 
 export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile = false, onOpenSidebar }: GeneratorModeProps) {
-  const [operation, setOperation] = useState<'addition' | 'subtraction' | 'multiplication' | 'crossed' | 'long-multiplication'>('addition');
-  const [numTerms, setNumTerms] = useState(2);
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [operation, setOperation] = useState<'addition' | 'multiplication' | 'crossed' | 'long-multiplication'>('addition');
   const [generated, setGenerated] = useState<GeneratedCryptarithm[]>([]);
   const [selectedCryptarithm, setSelectedCryptarithm] = useState<GeneratedCryptarithm | null>(null);
   const [customWords, setCustomWords] = useState<string[]>([]);
@@ -54,7 +52,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const getOperatorSymbol = (): string => {
     switch (operation) {
       case 'addition': return '+';
-      case 'subtraction': return '-';
       case 'multiplication': return '*';
       case 'crossed': return 'CROSS';
       case 'long-multiplication': return 'LMUL';
@@ -291,7 +288,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
             <h2 className="text-[24px] font-bold tracking-[-0.02em]">Paramètres de génération</h2>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Operation Type */}
             <div>
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
@@ -300,7 +297,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               <div className="space-y-2">
                 {[
                   { value: 'addition', label: 'Addition', icon: Plus },
-                  { value: 'subtraction', label: 'Soustraction', icon: Minus },
                   { value: 'multiplication', label: 'Multiplication', icon: X },
                   { value: 'crossed', label: 'Opération croisée', icon: Grid3x3 },
                   { value: 'long-multiplication', label: 'Multiplication longue', icon: Grid3x3 },
@@ -323,56 +319,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               </div>
             </div>
 
-            {/* Difficulty and Number of Terms */}
-            <div>
-              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
-                Niveau de difficulté
-              </label>
-              <div className="space-y-2 mb-6">
-                {[
-                  { value: 'easy', label: 'Facile' },
-                  { value: 'medium', label: 'Moyen' },
-                  { value: 'hard', label: 'Difficile' },
-                ].map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setDifficulty(value as any)}
-                    className={`
-                      w-full px-3 py-2 rounded-[12px] transition-all text-[14px] font-medium
-                      ${difficulty === value
-                        ? 'bg-[#0096BC] text-white'
-                        : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E5]'
-                      }
-                    `}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Number of Terms */}
-              {!['crossed', 'long-multiplication'].includes(operation) && (
-                <div>
-                  <label className="block text-[14px] font-medium text-[#1D1D1F] mb-2">
-                    Nombre de termes : {numTerms}
-                  </label>
-                  <input
-                    type="range"
-                    min="2"
-                    max="4"
-                    value={numTerms}
-                    onChange={(e) => setNumTerms(Number(e.target.value))}
-                    className="w-full accent-[#0096BC]"
-                  />
-                  <div className="flex justify-between text-[12px] text-[#86868B] mt-1">
-                    <span>2</span>
-                    <span>3</span>
-                    <span>4</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Custom Words Text Area */}
             <div>
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
@@ -383,7 +329,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                 onChange={(e) => handleCustomWordsTextChange(e.target.value)}
                 rows={6}
                 className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
-                placeholder="SEND&#10;MORE&#10;MONEY"
+                placeholder={`SEND\nMORE\nMONEY`}
               />
               <div className="flex items-center justify-between mt-2">
                 <p className="text-[#86868B] text-[12px]">
@@ -469,7 +415,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                   <p className="text-[13px] text-[#1D1D1F]">
                     <strong>Opération sélectionnée :</strong>{' '}
                     {operation === 'addition' ? 'Addition (+)' :
-                     operation === 'subtraction' ? 'Soustraction (-)' :
                      operation === 'multiplication' ? 'Multiplication (*)' :
                      operation === 'crossed' ? 'Opération croisée (CROSS)' :
                      operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}
