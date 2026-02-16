@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Star, Timer, HelpCircle, ChevronRight, Lock, Eye, EyeOff, Menu } from 'lucide-react';
+import { ArrowLeft, Trophy, Star, Timer, HelpCircle, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
 import DragDropBoard from './DragDropBoard';
+import { solveCryptarithm } from '../services/cryptatorApi';
 
 interface GameModeProps {
   onBack: () => void;
@@ -18,59 +19,143 @@ interface Level {
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-const gameLevels: Level[] = [
-  {
-    id: 1,
-    name: 'Niveau 1 : Premiers pas',
-    equation: 'A + B = C',
-    solution: { A: '1', B: '2', C: '3' },
-    timeLimit: 120,
-    difficulty: 'easy',
-  },
-  {
-    id: 2,
-    name: 'Niveau 2 : Double lettre',
-    equation: 'A + A = B',
-    solution: { A: '5', B: '10' },
-    timeLimit: 120,
-    difficulty: 'easy',
-  },
-  {
-    id: 3,
-    name: 'Niveau 3 : Trois lettres',
-    equation: 'AB + BA = CDC',
-    solution: { A: '5', B: '6', C: '1', D: '1' },
-    timeLimit: 180,
-    difficulty: 'medium',
-  },
-  {
-    id: 4,
-    name: 'Niveau 4 : Classique',
-    equation: 'TWO + TWO = FOUR',
-    solution: { T: '7', W: '6', O: '5', F: '1', U: '3', R: '0' },
-    timeLimit: 240,
-    difficulty: 'medium',
-  },
-  {
-    id: 5,
-    name: 'Niveau 5 : Expert',
-    equation: 'SEND + MORE = MONEY',
-    solution: { S: '9', E: '5', N: '6', D: '7', M: '1', O: '0', R: '8', Y: '2' },
-    timeLimit: 300,
-    difficulty: 'hard',
-  },
-];
+interface SavedCryptarithm {
+  id: string;
+  equation: string;
+  solution: string;
+  timestamp: string;
+}
 
 export default function GameMode({ onBack, tutorialCompleted, isMobile = false, onOpenSidebar }: GameModeProps) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [completedLevels, setCompletedLevels] = useState<Set<number>>(new Set());
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [timeElapsed, setTimeElapsed] = useState<number>(0);
+  const [totalVerifications, setTotalVerifications] = useState<number>(0);
   const [score, setScore] = useState(0);
   const [showHint, setShowHint] = useState(false);
-  const [showConstraints, setShowConstraints] = useState(false);
   const [levelStars, setLevelStars] = useState<Record<number, number>>({});
+  const [gameLevels, setGameLevels] = useState<Level[]>([]);
+  const [completedCryptarithms, setCompletedCryptarithms] = useState<Level[]>([]);
+  
+  // États pour le cryptarithme personnalisé
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customCryptarithm, setCustomCryptarithm] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // État pour la section des cryptarithmes terminés
+  const [showCompletedSection, setShowCompletedSection] = useState(false);
 
   const isEasyMode = selectedLevel?.difficulty === 'easy';
+
+  // Calcul des étoiles en temps réel
+  const calculateCurrentStars = () => {
+    const timeInMinutes = timeElapsed / 60;
+    
+    // 4 étoiles spéciales : 0 vérifications ET moins de 10 minutes
+    if (totalVerifications === 0 && timeInMinutes < 10) {
+      return 4;
+    }
+    
+    // 3 étoiles : 0-3 vérifications
+    if (totalVerifications <= 3) {
+      return 3;
+    }
+    
+    // 2 étoiles : 4-6 vérifications
+    if (totalVerifications <= 6) {
+      return 2;
+    }
+    
+    // 1 étoile : 7+ vérifications
+    return 1;
+  };
+
+  // Calcul des vérifications restantes avant de perdre une étoile
+  const getVerificationsUntilStarLoss = () => {
+    const timeInMinutes = timeElapsed / 60;
+    
+    // Si on vise les 4 étoiles
+    if (totalVerifications === 0 && timeInMinutes < 10) {
+      return null; // Déjà au maximum, mais attention au temps !
+    }
+    
+    if (totalVerifications < 4) {
+      return 4 - totalVerifications; // Avant de passer à 2 étoiles
+    } else if (totalVerifications < 7) {
+      return 7 - totalVerifications; // Avant de passer à 1 étoile
+    }
+    return 0; // Déjà à 1 étoile
+  };
+
+  // Charger les cryptarithmes générés depuis localStorage
+  useEffect(() => {
+    const loadGeneratedCryptarithms = () => {
+      const saved = localStorage.getItem('generatedCryptarithms');
+      if (saved) {
+        try {
+          const parsed: SavedCryptarithm[] = JSON.parse(saved);
+          
+          // Convertir les cryptarithmes sauvegardés en niveaux
+          const levels: Level[] = parsed
+            .filter(crypto => {
+              // Filtrer seulement ceux qui ont une solution (format tableau)
+              return crypto.solution && crypto.solution.includes('|');
+            })
+            .map((crypto, index) => {
+              // Parser la solution (format: " E| F| N|\n 9| 7| 1|")
+              const solutionMap: Record<string, string> = {};
+              const lines = crypto.solution.split('\n').map(l => l.trim());
+              
+              if (lines.length === 2) {
+                const letters = lines[0].split('|').map(s => s.trim()).filter(s => s.length > 0);
+                const values = lines[1].split('|').map(s => s.trim()).filter(s => s.length > 0);
+                
+                for (let i = 0; i < letters.length && i < values.length; i++) {
+                  if (letters[i] && values[i]) {
+                    solutionMap[letters[i]] = values[i];
+                  }
+                }
+              }
+              
+              // Vérifier que la solution a bien été parsée (au moins une lettre)
+              if (Object.keys(solutionMap).length === 0) {
+                return null;
+              }
+              
+              return {
+                id: 1000 + index, // ID unique pour les niveaux générés
+                name: `Cryptarithme #${index + 1}`,
+                equation: crypto.equation,
+                solution: solutionMap,
+                timeLimit: 300,
+                difficulty: 'medium',
+              } as Level;
+            })
+            .filter((level): level is Level => level !== null);
+          
+          setGameLevels(levels);
+        } catch (error) {
+          console.error('Erreur lors du chargement des cryptarithmes:', error);
+          setGameLevels([]);
+        }
+      } else {
+        setGameLevels([]);
+      }
+    };
+    
+    loadGeneratedCryptarithms();
+    
+    // Charger les cryptarithmes terminés
+    const savedCompleted = localStorage.getItem('completedCryptarithms');
+    if (savedCompleted) {
+      try {
+        setCompletedCryptarithms(JSON.parse(savedCompleted));
+      } catch (error) {
+        console.error('Erreur lors du chargement des cryptarithmes terminés:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('completedLevels');
@@ -90,19 +175,23 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
   }, []);
 
   useEffect(() => {
-    if (selectedLevel && timeRemaining > 0) {
+    if (selectedLevel) {
       const timer = setInterval(() => {
-        setTimeRemaining((prev) => Math.max(0, prev - 1));
+        setTimeElapsed((prev) => prev + 1);
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [selectedLevel, timeRemaining]);
+  }, [selectedLevel]);
 
   const handleLevelSelect = (level: Level) => {
     setSelectedLevel(level);
-    setTimeRemaining(level.timeLimit);
+    setTimeElapsed(0);
+    setTotalVerifications(0);
     setShowHint(false);
-    setShowConstraints(false);
+  };
+
+  const handleVerification = () => {
+    setTotalVerifications(prev => prev + 1);
   };
 
   const handleLevelComplete = () => {
@@ -112,12 +201,15 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     newCompleted.add(selectedLevel.id);
     setCompletedLevels(newCompleted);
     localStorage.setItem('completedLevels', JSON.stringify(Array.from(newCompleted)));
+    
+    // Ajouter aux cryptarithmes terminés si ce n'est pas déjà fait
+    if (!completedCryptarithms.some(c => c.id === selectedLevel.id)) {
+      const newCompletedCryptos = [...completedCryptarithms, selectedLevel];
+      setCompletedCryptarithms(newCompletedCryptos);
+      localStorage.setItem('completedCryptarithms', JSON.stringify(newCompletedCryptos));
+    }
 
-    const timeUsed = selectedLevel.timeLimit - timeRemaining;
-    const percentage = (timeRemaining / selectedLevel.timeLimit) * 100;
-    let stars = 1;
-    if (percentage > 66) stars = 3;
-    else if (percentage > 33) stars = 2;
+    const stars = calculateCurrentStars();
 
     const newStars = { ...levelStars, [selectedLevel.id]: Math.max(stars, levelStars[selectedLevel.id] || 0) };
     setLevelStars(newStars);
@@ -143,6 +235,137 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     return true;
   };
 
+  const handleCustomCryptarithmSubmit = async () => {
+    if (!customCryptarithm.trim()) {
+      setValidationError('Veuillez entrer un cryptarithme');
+      return;
+    }
+
+    setIsValidating(true);
+    setValidationError(null);
+
+    try {
+      // Appel à l'API pour vérifier le nombre de solutions
+      const response = await solveCryptarithm({
+        cryptarithm: customCryptarithm.trim(),
+        solverType: 'SCALAR',
+        solutionLimit: 2, // On cherche maximum 2 solutions pour vérifier qu'il y en a exactement 1
+        timeLimit: 10000,
+      });
+
+      if (!response.success) {
+        setValidationError(response.error || 'Erreur lors de la validation du cryptarithme');
+        setIsValidating(false);
+        return;
+      }
+
+      if (response.solutionCount === 0) {
+        setValidationError('Ce cryptarithme n\'a aucune solution');
+        setIsValidating(false);
+        return;
+      }
+
+      if (response.solutionCount > 1) {
+        setValidationError(`Ce cryptarithme a ${response.solutionCount} solutions. Il doit avoir exactement une solution unique.`);
+        setIsValidating(false);
+        return;
+      }
+
+      // Si on arrive ici, le cryptarithme a exactement 1 solution
+      const solution = response.solutions[0];
+      const solutionMap: Record<string, string> = {};
+      
+      console.log('=== PARSING SOLUTION FROM API ===');
+      console.log('Response complète:', response);
+      console.log('Solution brute:', solution);
+      console.log('Assignment string:', solution.assignment);
+      
+      // Parser la solution (format de l'API: " E| F| N|\n 9| 7| 1|")
+      // La première ligne contient les lettres, la deuxième ligne les valeurs
+      const lines = solution.assignment.split('\n').map(l => l.trim());
+      console.log('Lignes après split:', lines);
+      
+      if (lines.length === 2) {
+        // Extraire les lettres et valeurs en utilisant le séparateur "|"
+        const letters = lines[0].split('|').map(s => s.trim()).filter(s => s.length > 0);
+        const values = lines[1].split('|').map(s => s.trim()).filter(s => s.length > 0);
+        
+        console.log('Lettres extraites:', letters);
+        console.log('Valeurs extraites:', values);
+        
+        // Créer le mapping lettre -> valeur
+        for (let i = 0; i < letters.length && i < values.length; i++) {
+          if (letters[i] && values[i]) {
+            solutionMap[letters[i]] = values[i];
+            console.log(`Ajout dans solutionMap: ${letters[i]} = ${values[i]}`);
+          }
+        }
+      }
+      
+      console.log('SolutionMap final:', solutionMap);
+
+      // Créer un niveau personnalisé
+      const customLevel: Level = {
+        id: 999, // ID spécial pour les niveaux personnalisés
+        name: 'Cryptarithme personnalisé',
+        equation: customCryptarithm.trim(),
+        solution: solutionMap,
+        timeLimit: 300, // 5 minutes par défaut
+        difficulty: 'medium',
+      };
+      
+      console.log('CustomLevel créé:', customLevel);
+
+      // Lancer le jeu avec ce niveau
+      setShowCustomModal(false);
+      setCustomCryptarithm('');
+      handleLevelSelect(customLevel);
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : 'Erreur lors de la validation');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleDeleteCryptarithm = (levelId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Retirer de la liste des niveaux
+    const updatedLevels = gameLevels.filter(level => level.id !== levelId);
+    setGameLevels(updatedLevels);
+    
+    // Retirer du localStorage generatedCryptarithms
+    const saved = localStorage.getItem('generatedCryptarithms');
+    if (saved) {
+      try {
+        const parsed: SavedCryptarithm[] = JSON.parse(saved);
+        // Trouver l'index correspondant (levelId format: 1000 + index)
+        const index = levelId - 1000;
+        const updated = parsed.filter((_, i) => i !== index);
+        localStorage.setItem('generatedCryptarithms', JSON.stringify(updated));
+      } catch (error) {
+        console.error('Erreur lors de la suppression du cryptarithme:', error);
+      }
+    }
+    
+    // Retirer des cryptarithmes terminés si présent
+    const updatedCompleted = completedCryptarithms.filter(c => c.id !== levelId);
+    setCompletedCryptarithms(updatedCompleted);
+    localStorage.setItem('completedCryptarithms', JSON.stringify(updatedCompleted));
+    
+    // Retirer des niveaux complétés
+    const newCompletedLevels = new Set(completedLevels);
+    newCompletedLevels.delete(levelId);
+    setCompletedLevels(newCompletedLevels);
+    localStorage.setItem('completedLevels', JSON.stringify(Array.from(newCompletedLevels)));
+    
+    // Retirer des étoiles
+    const newStars = { ...levelStars };
+    delete newStars[levelId];
+    setLevelStars(newStars);
+    localStorage.setItem('levelStars', JSON.stringify(newStars));
+  };
+
   if (selectedLevel) {
     return (
       <div className="min-h-screen px-8 py-16">
@@ -162,22 +385,10 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
               {/* Timer */}
               <div className="flex items-center gap-2 bg-white border border-[#E5E5E5] px-4 py-2 rounded-[12px]">
                 <Timer className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
-                <span className={`font-mono text-[14px] font-medium ${timeRemaining < 30 ? 'text-[#FF3B30]' : 'text-[#1D1D1F]'}`}>
-                  {formatTime(timeRemaining)}
+                <span className="font-mono text-[14px] font-medium text-[#1D1D1F]">
+                  {formatTime(timeElapsed)}
                 </span>
               </div>
-
-              {/* Constraints Button */}
-              <button
-                onClick={() => setShowConstraints(!showConstraints)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-[12px] transition-colors text-[14px] font-medium ${showConstraints
-                  ? 'bg-[#0096BC] text-white'
-                  : 'bg-white border border-[#E5E5E5] text-[#1D1D1F] hover:border-[#0096BC]'
-                  }`}
-              >
-                {showConstraints ? <Eye className="w-5 h-5" strokeWidth={1.5} /> : <EyeOff className="w-5 h-5" strokeWidth={1.5} />}
-                <span>Contraintes</span>
-              </button>
 
               {/* Help Button */}
               <button
@@ -194,7 +405,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
           <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">
             <div className="mb-8">
               <h2 className="text-[24px] font-bold mb-2 tracking-[-0.02em]">{selectedLevel.name}</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-4">
                 <span className={`
                   px-3 py-1 rounded-full text-[14px] font-medium
                   ${selectedLevel.difficulty === 'easy' ? 'bg-[#D4F4DD] text-[#1D1D1F]' : ''}
@@ -206,24 +417,41 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   {selectedLevel.difficulty === 'hard' && 'Difficile'}
                 </span>
               </div>
+              
+              {/* Score actuel avec étoiles */}
+              <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Score actuel :</p>
+                    <p className="text-[24px]">
+                      {calculateCurrentStars() === 4 ? '🌟⭐⭐⭐' : '⭐'.repeat(calculateCurrentStars()) + '☆'.repeat(3 - calculateCurrentStars())}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[13px] text-[#86868B]">Vérifications : <span className="font-semibold text-[#1D1D1F]">{totalVerifications}</span></p>
+                    {calculateCurrentStars() === 4 && (
+                      <p className="text-[13px] text-[#34C759] font-medium mt-1">
+                        🌟 Parfait ! Continuez sans vérifier !
+                      </p>
+                    )}
+                    {calculateCurrentStars() < 4 && getVerificationsUntilStarLoss() !== null && getVerificationsUntilStarLoss()! > 0 && (
+                      <p className="text-[13px] text-[#FF9500] font-medium mt-1">
+                        ⚠️ Encore {getVerificationsUntilStarLoss()} vérif avant de perdre 1★
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <DragDropBoard
               equation={selectedLevel.equation}
               solution={selectedLevel.solution}
               onSolved={handleLevelComplete}
+              onVerification={handleVerification}
               showHints={showHint}
               easyMode={isEasyMode}
-              showConstraints={showConstraints}
             />
-
-            {timeRemaining === 0 && (
-              <div className="mt-8 p-4 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] text-center">
-                <p className="text-[#FF3B30] text-[14px]">
-                  Temps écoulé ! Vous pouvez continuer sans limite de temps.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -268,11 +496,117 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
           <h1 className="text-[32px] font-bold mb-2 tracking-[-0.02em]">Mode Aventure</h1>
           <p className="text-[14px] text-[#86868B] mb-10">
-            Progressez à travers les niveaux et gagnez des étoiles !
+            Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <span className="font-semibold text-[#0096BC]">Génération</span> pour enrichir votre collection.
           </p>
 
+          {/* Bouton Cryptarithme personnalisé */}
+          <button
+            onClick={() => setShowCustomModal(true)}
+            className="w-full p-6 mb-6 rounded-[12px] transition-all text-left border bg-gradient-to-r from-[#0096BC] to-[#007EA1] border-transparent hover:shadow-lg active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-[12px] bg-white/20 flex items-center justify-center">
+                  <Plus className="w-6 h-6 text-white" strokeWidth={2} />
+                </div>
+                <div>
+                  <h3 className="text-white mb-1 font-semibold text-[16px] tracking-[-0.01em]">Cryptarithme personnalisé</h3>
+                  <p className="text-white/80 text-[14px]">Créez votre propre défi !</p>
+                </div>
+              </div>
+              <ChevronRight className="w-6 h-6 text-white" strokeWidth={1.5} />
+            </div>
+          </button>
+
+          {/* Section Cryptarithmes terminés (dépliable) */}
+          {completedCryptarithms.length > 0 && (
+            <div className="bg-white rounded-[12px] border border-[#E5E5E5] mb-6">
+              <button
+                onClick={() => setShowCompletedSection(!showCompletedSection)}
+                className="w-full p-6 rounded-[12px] transition-all text-left hover:bg-[#F5F5F7]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-[12px] bg-green-500 flex items-center justify-center">
+                      <Check className="w-6 h-6 text-white" strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <h3 className="text-[#1D1D1F] mb-1 font-semibold text-[16px] tracking-[-0.01em]">Cryptarithmes terminés</h3>
+                      <p className="text-[#86868B] text-[14px]">
+                        {completedCryptarithms.length} cryptarithme{completedCryptarithms.length > 1 ? 's' : ''} résolu{completedCryptarithms.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`w-6 h-6 text-[#86868B] transition-transform duration-200 ${showCompletedSection ? 'rotate-180' : ''}`}
+                    strokeWidth={1.5}
+                  />
+                </div>
+              </button>
+              
+              {showCompletedSection && (
+                <div className="px-6 pb-6 space-y-3">
+                  {completedCryptarithms.map((crypto) => (
+                    <div
+                      key={crypto.id}
+                      className="p-4 rounded-[12px] bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-10 h-10 rounded-[10px] bg-green-500 flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-[#1D1D1F] font-semibold text-[14px]">{crypto.name}</h3>
+                            <p className="text-[#86868B] text-[13px] font-mono">{crypto.equation}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {levelStars[crypto.id] && (
+                            <div className="flex gap-1 items-center">
+                              {levelStars[crypto.id] === 4 ? (
+                                <span className="text-[18px]">🌟</span>
+                              ) : null}
+                              {[1, 2, 3].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-4 h-4 ${
+                                    star <= (levelStars[crypto.id] === 4 ? 3 : levelStars[crypto.id] || 0)
+                                      ? 'fill-[#FF9500] text-[#FF9500]'
+                                      : 'text-[#E5E5E5]'
+                                  }`}
+                                  strokeWidth={1.5}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleLevelSelect(crypto)}
+                            className="px-4 py-2 rounded-[8px] bg-white border border-green-300 text-green-600 text-[13px] font-medium hover:bg-green-50 active:scale-95 transition-all"
+                          >
+                            Rejouer
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-4">
-            {gameLevels.map((level) => {
+            {gameLevels.filter(level => !completedCryptarithms.some(c => c.id === level.id)).length === 0 ? (
+              <div className="bg-[#F5F5F7] border border-[#E5E5E5] rounded-[12px] p-8 text-center">
+                <p className="text-[#86868B] text-[14px] mb-4">
+                  Aucun cryptarithme disponible pour le moment.
+                </p>
+                <p className="text-[#86868B] text-[14px]">
+                  Rendez-vous dans le mode <span className="font-semibold text-[#0096BC]">Génération</span> pour créer des cryptarithmes, puis revenez ici pour les jouer !
+                </p>
+              </div>
+            ) : (
+              gameLevels.filter(level => !completedCryptarithms.some(c => c.id === level.id)).map((level, index) => {
               const isUnlocked = isLevelUnlocked(level.id);
               const isCompleted = completedLevels.has(level.id);
               const stars = levelStars[level.id] || 0;
@@ -293,10 +627,10 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className={`
-                        w-12 h-12 rounded-[12px] flex items-center justify-center font-semibold
+                        w-12 h-12 rounded-[12px] flex items-center justify-center font-semibold text-[14px]
                         ${isUnlocked ? 'bg-[#0096BC] text-white' : 'bg-[#E5E5E5] text-[#86868B]'}
                       `}>
-                        {isUnlocked ? level.id : <Lock className="w-6 h-6" strokeWidth={1.5} />}
+                        {isUnlocked ? `#${index + 1}` : <Lock className="w-6 h-6" strokeWidth={1.5} />}
                       </div>
 
                       <div>
@@ -305,13 +639,16 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       {isCompleted && (
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 items-center">
+                          {stars === 4 ? (
+                            <span className="text-[20px]">🌟</span>
+                          ) : null}
                           {[1, 2, 3].map((star) => (
                             <Star
                               key={star}
-                              className={`w-5 h-5 ${star <= stars ? 'fill-[#FF9500] text-[#FF9500]' : 'text-[#E5E5E5]'
+                              className={`w-5 h-5 ${star <= (stars === 4 ? 3 : stars) ? 'fill-[#FF9500] text-[#FF9500]' : 'text-[#E5E5E5]'
                                 }`}
                               strokeWidth={1.5}
                             />
@@ -319,14 +656,99 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                         </div>
                       )}
 
+                      {/* Bouton de suppression */}
+                      <button
+                        onClick={(e) => handleDeleteCryptarithm(level.id, e)}
+                        className="w-8 h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group"
+                        aria-label="Supprimer ce cryptarithme"
+                      >
+                        <X className="w-4 h-4 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={2} />
+                      </button>
+
                       {isUnlocked && <ChevronRight className="w-6 h-6 text-[#0096BC]" strokeWidth={1.5} />}
                     </div>
                   </div>
                 </button>
               );
-            })}
+            }))}
           </div>
         </div>
+
+        {/* Modal Cryptarithme personnalisé */}
+        {showCustomModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[16px] p-10 max-w-xl w-full border-2 border-[#E5E5E5] shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-[24px] font-bold tracking-[-0.02em]">Cryptarithme personnalisé</h2>
+                <button
+                  onClick={() => {
+                    setShowCustomModal(false);
+                    setCustomCryptarithm('');
+                    setValidationError(null);
+                  }}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#86868B]" strokeWidth={1.5} />
+                </button>
+              </div>
+
+              <p className="text-[14px] text-[#86868B] mb-6">
+                Entrez un cryptarithme qui a une et une seule solution. Exemple : <span className="font-mono">SEND + MORE = MONEY</span>
+              </p>
+
+              <div className="mb-6">
+                <label className="block text-[14px] font-medium text-[#1D1D1F] mb-2">
+                  Cryptarithme
+                </label>
+                <input
+                  type="text"
+                  value={customCryptarithm}
+                  onChange={(e) => {
+                    setCustomCryptarithm(e.target.value);
+                    setValidationError(null);
+                  }}
+                  placeholder="ex: ABC + DEF = GHIJ"
+                  className="w-full px-4 py-3 bg-white border border-[#E5E5E5] rounded-[12px] text-[14px] font-mono focus:border-[#0096BC] focus:outline-none transition-colors"
+                  disabled={isValidating}
+                />
+              </div>
+
+              {validationError && (
+                <div className="mb-6 p-4 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px]">
+                  <p className="text-[#FF3B30] text-[14px]">{validationError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCustomModal(false);
+                    setCustomCryptarithm('');
+                    setValidationError(null);
+                  }}
+                  className="flex-1 px-4 py-3 rounded-[12px] border border-[#E5E5E5] text-[#1D1D1F] font-medium text-[14px] hover:bg-[#F5F5F7] transition-colors"
+                  disabled={isValidating}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleCustomCryptarithmSubmit}
+                  disabled={isValidating || !customCryptarithm.trim()}
+                  className="flex-1 px-4 py-3 rounded-[12px] bg-[#0096BC] text-white font-medium text-[14px] hover:bg-[#007EA1] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isValidating ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" strokeWidth={2} />
+                      Validation...
+                    </>
+                  ) : (
+                    'Valider et jouer'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -48,6 +48,29 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
 
+    // Charger les cryptarithmes sauvegardés au démarrage
+  useEffect(() => {
+    const saved = localStorage.getItem('generatedCryptarithms');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setGenerated(parsed.map((c: any) => ({
+          ...c,
+          timestamp: new Date(c.timestamp),
+        })));
+      } catch (error) {
+        console.error('Erreur lors du chargement des cryptarithmes:', error);
+      }
+    }
+  }, []);
+
+  // Sauvegarder automatiquement les cryptarithmes générés
+  useEffect(() => {
+    if (generated.length > 0) {
+      localStorage.setItem('generatedCryptarithms', JSON.stringify(generated));
+    }
+  }, [generated]);
+
   // Synchroniser le symbole d'opération avec le type d'opération sélectionné
   const getOperatorSymbol = (): string => {
     switch (operation) {

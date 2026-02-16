@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Check, X, RotateCcw, Lightbulb, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, RotateCcw, Lightbulb, AlertCircle } from 'lucide-react';
 import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
 
 interface DragDropBoardProps {
   equation: string;
   solution?: Record<string, string>; // Make solution optional
   onSolved?: () => void;
+  onVerification?: () => void;
   showHints?: boolean;
   easyMode?: boolean;
-  showConstraints?: boolean;
 }
 
-export default function DragDropBoard({ equation, solution, onSolved, showHints = false, easyMode = false, showConstraints = false }: DragDropBoardProps) {
+export default function DragDropBoard({ equation, solution, onSolved, onVerification, showHints = false, easyMode = false }: DragDropBoardProps) {
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [letterDomains, setLetterDomains] = useState<Record<string, Set<number>>>({});
   const [verifiedLetters, setVerifiedLetters] = useState<Record<string, 'correct' | 'incorrect' | null>>({});
@@ -20,10 +20,10 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [selectedDigit, setSelectedDigit] = useState<string | null>(null);
-  const [expandedLetters, setExpandedLetters] = useState<Set<string>>(new Set());
   const [hintMessage, setHintMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highlightedLetters, setHighlightedLetters] = useState<Set<string>>(new Set());
+  const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({});
 
   const letters = Array.from(new Set(equation.match(/[A-Z]/g) || []));
   const availableDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -81,8 +81,21 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
     
     if (isCorrect) {
       setFeedback('correct');
+      
+      // Marquer toutes les lettres comme correctes (en vert)
+      const allCorrect: Record<string, 'correct' | 'incorrect' | null> = {};
+      letters.forEach(letter => {
+        if (assignments[letter]) {
+          allCorrect[letter] = 'correct';
+        }
+      });
+      setVerifiedLetters(allCorrect);
+      
+      // Afficher un message de succès
+      setHintMessage('🎉 Félicitations ! Vous avez résolu le cryptarithme !');
+      
       if (onSolved) {
-        setTimeout(() => onSolved(), 500);
+        setTimeout(() => onSolved(), 2000);
       }
     } else {
       setFeedback('incorrect');
@@ -104,6 +117,15 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
 
   const handleDrop = (letter: string) => {
     if (draggedDigit) {
+      // Prevent modifying a letter that has been verified as correct
+      if (verifiedLetters[letter] === 'correct') {
+        setErrorMessage(`La lettre ${letter} est déjà correctement assignée et ne peut pas être modifiée`);
+        setTimeout(() => setErrorMessage(null), 3000);
+        setDraggedDigit(null);
+        setHighlightedLetters(new Set());
+        return;
+      }
+
       const numAssignments = Object.fromEntries(
         Object.entries(assignments).map(([k, v]) => [k, Number(v)])
       );
@@ -155,6 +177,7 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
     setHintMessage(null);
     setErrorMessage(null);
     setHighlightedLetters(new Set());
+    setEliminatedValues({});
     
     // Reset all letter domains with proper leading letter handling
     const leadingLetters = getLeadingLetters(equation);
@@ -172,24 +195,23 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
   const handleLetterClick = (letter: string) => {
     setSelectedLetter(letter);
     setSelectedDigit(null);
-    
-    // Show constraints for this letter
-    const numAssignments = Object.fromEntries(
-      Object.entries(assignments).map(([k, v]) => [k, Number(v)])
-    );
-    const hint = getHintForLetter(equation, letter, numAssignments);
-    setHintMessage(hint);
   };
-
-  const toggleLetterExpansion = (letter: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering handleLetterClick
-    const newExpanded = new Set(expandedLetters);
-    if (newExpanded.has(letter)) {
-      newExpanded.delete(letter);
-    } else {
-      newExpanded.add(letter);
+  
+  const toggleEliminatedValue = (letter: string, value: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const newEliminated = { ...eliminatedValues };
+    if (!newEliminated[letter]) {
+      newEliminated[letter] = new Set();
     }
-    setExpandedLetters(newExpanded);
+    
+    if (newEliminated[letter].has(value)) {
+      newEliminated[letter].delete(value);
+    } else {
+      newEliminated[letter].add(value);
+    }
+    
+    setEliminatedValues(newEliminated);
   };
 
   const handleDigitClick = (digit: string) => {
@@ -211,8 +233,6 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
   };
 
   const getLetterConstraintsInfo = (letter: string) => {
-    if (!showConstraints) return null;
-    
     const numAssignments = Object.fromEntries(
       Object.entries(assignments).map(([k, v]) => [k, Number(v)])
     );
@@ -262,7 +282,12 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
       return;
     }
 
-    const newDomains = { ...letterDomains };
+    // Créer une copie profonde des domaines (copier tous les Sets)
+    const newDomains: Record<string, Set<number>> = {};
+    Object.keys(letterDomains).forEach(key => {
+      newDomains[key] = new Set(letterDomains[key]);
+    });
+    
     const newVerified = { ...verifiedLetters };
     const newAssignments = { ...assignments };
     let correctCount = 0;
@@ -275,21 +300,43 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
       return;
     }
 
+    // Debug logging
+    console.log('=== VERIFICATION DEBUG ===');
+    console.log('Solution complète:', solution);
+    console.log('Assignments actuels:', assignments);
+
     // Check each assignment
     Object.entries(assignments).forEach(([letter, digit]) => {
-      const isCorrect = solution[letter] === digit;
+      // Check if solution exists for this letter
+      if (!(letter in solution)) {
+        console.warn(`Lettre ${letter} non trouvée dans la solution!`);
+        return;
+      }
+
+      // Convert both to string for comparison to ensure type consistency
+      const correctValue = String(solution[letter]);
+      const assignedValue = String(digit);
+      
+      console.log(`Lettre ${letter}: correct=${correctValue}, assigné=${assignedValue}, match=${correctValue === assignedValue}`);
+      
+      const isCorrect = correctValue === assignedValue;
       
       if (isCorrect) {
         // Mark as correct and reduce domain to only this digit
         newVerified[letter] = 'correct';
         newDomains[letter] = new Set([Number(digit)]);
         correctCount++;
+        
+        // IMPORTANT: Enlever ce chiffre du domaine de toutes les autres lettres
+        Object.keys(newDomains).forEach(otherLetter => {
+          if (otherLetter !== letter) {
+            newDomains[otherLetter].delete(Number(digit));
+          }
+        });
       } else {
         // Mark as incorrect, remove digit from domain, and clear the assignment
         newVerified[letter] = 'incorrect';
-        const domain = new Set(letterDomains[letter]);
-        domain.delete(Number(digit));
-        newDomains[letter] = domain;
+        newDomains[letter].delete(Number(digit));
         incorrectCount++;
         
         // Remove the incorrect assignment
@@ -310,7 +357,11 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
       setHintMessage(`✗ Aucune attribution correcte. Les chiffres incorrects ont été retirés et les domaines mis à jour.`);
     }
 
-    // Clear incorrect badges after showing them briefly
+    // Notifier le parent qu'une vérification a été effectuée
+    if (onVerification) {
+      onVerification();
+    }
+    // Clear ONLY incorrect badges after showing them briefly (keep correct badges)
     setTimeout(() => {
       setVerifiedLetters(prev => {
         const updated = { ...prev };
@@ -318,6 +369,7 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
           if (updated[key] === 'incorrect') {
             updated[key] = null;
           }
+          // Keep 'correct' badges permanently
         });
         return updated;
       });
@@ -354,22 +406,46 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
       {/* Letter Assignment Zones */}
       <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
         {letters.map(letter => {
-          const constraints = getLetterConstraintsInfo(letter);
           const isHighlighted = highlightedLetters.has(letter);
           const isSelected = selectedLetter === letter;
-          const domain = letterDomains[letter] || new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-          const domainArray = Array.from(domain).sort((a, b) => a - b);
           const hasAssignment = !!assignments[letter];
           const verificationStatus = verifiedLetters[letter];
+          const isLocked = verificationStatus === 'correct';
+          
+          // Utiliser uniquement les lettres vérifiées comme correctes pour les contraintes
+          const verifiedAssignments: Record<string, number> = {};
+          Object.entries(assignments).forEach(([l, v]) => {
+            if (verifiedLetters[l] === 'correct') {
+              verifiedAssignments[l] = Number(v);
+            }
+          });
+          const constraints = getLetterConstraints(equation, letter, verifiedAssignments);
+          
+          // Filtrer avec les domaines stockés (qui sont réduits lors de la vérification)
+          const storedDomain = letterDomains[letter] || new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+          const possibleValues = constraints.possibleValues.filter(val => storedDomain.has(val));
           
           return (
             <div
               key={letter}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => handleDrop(letter)}
-              onClick={() => handleLetterClick(letter)}
+              onDragOver={(e) => {
+                if (!isLocked) {
+                  e.preventDefault();
+                }
+              }}
+              onDrop={() => {
+                if (!isLocked) {
+                  handleDrop(letter);
+                }
+              }}
+              onClick={() => {
+                if (!isLocked) {
+                  handleLetterClick(letter);
+                }
+              }}
               className={`
-                relative p-6 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer
+                relative p-6 rounded-2xl border-2 border-dashed transition-all duration-300
+                ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}
                 ${verificationStatus === 'correct'
                   ? 'bg-gradient-to-br from-green-100 to-emerald-100 border-green-400 shadow-lg scale-105'
                   : verificationStatus === 'incorrect'
@@ -412,81 +488,45 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
                   )}
                 </div>
                 
-                {/* Domain Display */}
-                {!hasAssignment && domainArray.length > 0 && (
+                {/* Domain Display - Toujours affiché sauf si la lettre est verrouillée */}
+                {!isLocked && possibleValues.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="text-xs text-gray-500 mb-2 font-medium">Domaine :</div>
+                    <div className="text-xs text-gray-500 mb-2 font-medium flex items-center justify-center gap-1">
+                      Domaine :
+                      <span className="text-[10px] text-gray-400">(cliquer pour éliminer)</span>
+                    </div>
                     <div className="flex flex-wrap gap-1 justify-center">
-                      {domainArray.map(val => (
-                        <span 
-                          key={val} 
-                          className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-mono"
-                        >
-                          {val}
-                        </span>
-                      ))}
+                      {possibleValues.map(val => {
+                        const isEliminated = eliminatedValues[letter]?.has(val);
+                        const isCurrent = hasAssignment && Number(assignments[letter]) === val;
+                        
+                        return (
+                          <button
+                            key={val}
+                            onClick={(e) => toggleEliminatedValue(letter, val, e)}
+                            className={`px-1.5 py-0.5 rounded text-xs font-mono transition-all cursor-pointer hover:scale-110 ${
+                              isCurrent
+                                ? 'bg-purple-200 text-purple-800 font-semibold'
+                                : isEliminated
+                                ? 'bg-red-100 text-red-400 line-through opacity-50'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
                 
                 {/* Empty Domain Warning */}
-                {!hasAssignment && domainArray.length === 0 && (
+                {!isLocked && possibleValues.length === 0 && (
                   <div className="mt-3 pt-3 border-t border-red-200">
                     <div className="text-xs text-red-600 font-medium">Domaine vide !</div>
                   </div>
                 )}
               </div>
-              
-              {/* Constraints Badge with Toggle Button */}
-              {showConstraints && constraints && !assignments[letter] && (
-                <>
-                  <button
-                    onClick={(e) => toggleLetterExpansion(letter, e)}
-                    className="absolute -top-2 -right-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs shadow-lg transition-all duration-300 hover:scale-110 z-20"
-                  >
-                    {expandedLetters.has(letter) ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
-                  
-                  {/* Constraints Details - Collapsible */}
-                  {expandedLetters.has(letter) && (
-                    <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-white border-2 border-blue-300 rounded-lg shadow-xl text-xs z-10 animate-fade-in">
-                      <div className="mb-2">
-                        <p className="text-gray-700 mb-1 font-semibold">✓ Valeurs possibles:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {constraints.possibleValues.map(val => (
-                            <span key={val} className="px-2 py-1 bg-green-100 text-green-700 rounded font-mono text-xs">
-                              {val}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {constraints.impossibleValues.length > 0 && (
-                        <div className="mb-2">
-                          <p className="text-gray-700 mb-1 font-semibold">✗ Valeurs impossibles:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {constraints.impossibleValues.map(val => (
-                              <span key={val} className="px-2 py-1 bg-red-100 text-red-700 rounded font-mono text-xs">
-                                {val}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {constraints.reason && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-gray-600 italic text-xs">{constraints.reason}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
             </div>
           );
         })}
@@ -552,9 +592,8 @@ export default function DragDropBoard({ equation, solution, onSolved, showHints 
           </p>
           <ul className="text-sm space-y-1">
             <li>• Les lettres en début de mot ne peuvent pas être 0</li>
-            <li>• Cliquez sur une lettre pour voir ses contraintes</li>
+            <li>• Cliquez sur une valeur du domaine pour l'éliminer manuellement (comme les drapeaux du démineur)</li>
             <li>• Cliquez sur un chiffre pour voir où il peut aller</li>
-            {showConstraints && <li>• Cliquez sur les boutons ⌄/⌃ pour voir/masquer les détails des contraintes</li>}
             {easyMode && <li>• En mode facile, les mauvaises décisions sont bloquées</li>}
           </ul>
         </div>
