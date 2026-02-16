@@ -59,17 +59,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       }
     });
     setLetterDomains(initialDomains);
-    
-    // Réinitialiser les assignations quand l'équation change
-    setAssignments({});
-    setVerifiedLetters({});
-    setEliminatedValues({});
-    setSelectedLetter(null);
-    setSelectedDigit(null);
-    setFeedback(null);
-    setHintMessage(null);
-    setErrorMessage(null);
-    setHighlightedLetters(new Set());
   }, [equation]);
 
   // Use cached game state
@@ -400,13 +389,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
               isHighlighted ? 'scale-110' : ''
             }`}
           >
-            <span className={`text-base md:text-2xl lg:text-3xl text-gray-800 font-mono ${
+            <span className={`text-base md:text-3xl lg:text-5xl text-gray-800 font-mono ${
               isHighlighted ? 'text-purple-600 animate-pulse' : ''
             }`}>
               {char}
             </span>
             {hasAssignment && (
-              <span className="absolute -bottom-5 md:-bottom-7 lg:-bottom-8 left-1/2 -translate-x-1/2 text-sm md:text-xl lg:text-2xl text-purple-600 font-mono animate-fade-in">
+              <span className="absolute -bottom-6 md:-bottom-12 lg:-bottom-16 left-1/2 -translate-x-1/2 text-sm md:text-2xl lg:text-3xl text-purple-600 font-mono animate-fade-in">
                 {hasAssignment}
               </span>
             )}
@@ -426,7 +415,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         
         // Ajouter l'espace ou l'opérateur
         parts.push(
-          <span key={`op-${index}`} className="text-base md:text-2xl lg:text-3xl text-gray-800 font-mono px-0.5">
+          <span key={`op-${index}`} className="text-base md:text-3xl lg:text-5xl text-gray-800 font-mono px-0.5">
             {char}
           </span>
         );
@@ -549,7 +538,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   };
 
   return (
-    <div className="space-y-8 relative pb-[40rem] md:pb-56">
+    <div className="space-y-8 sm:space-y-5 md:space-y-6 relative pb-[32rem] md:pb-56">
       {/* Élément visuel qui suit le doigt pendant le drag tactile */}
       {touchDraggedDigit && touchPosition && (
         <>
@@ -592,8 +581,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       )}
 
       {/* Equation Display */}
-      <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl p-6 md:p-8 lg:p-10 text-center border border-purple-200 shadow-lg overflow-hidden">
-        <div className="mb-8 md:mb-10 lg:mb-12 break-words overflow-x-auto">
+      <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl sm:rounded-xl p-6 sm:p-4 md:p-5 text-center border border-purple-200 shadow-lg overflow-hidden">
+        <div className="mb-8 sm:mb-5 md:mb-6 break-words overflow-x-auto">
           <div className="inline-block min-w-0 max-w-full">
             {renderEquation()}
           </div>
@@ -601,7 +590,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       </div>
 
       {/* Letter Assignment Zones */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-2.5 md:gap-3">
         {letters.map(letter => {
           const isHighlighted = highlightedLetters.has(letter);
           const isSelected = selectedLetter === letter;
@@ -643,7 +632,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                 }
               }}
               className={`
-                relative p-3 md:p-4 lg:p-6 rounded-xl md:rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden
+                relative p-3 sm:p-1.5 md:p-2 rounded-xl sm:rounded-lg border-2 border-dashed transition-all duration-300 overflow-hidden
                 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}
                 ${verificationStatus === 'correct'
                   ? 'bg-gradient-to-br from-green-100 to-emerald-100 border-green-400 shadow-lg scale-105'
@@ -661,21 +650,21 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
             >
               {/* Verification Badge */}
               {verificationStatus === 'correct' && (
-                <div className="absolute -top-2 -left-2 bg-green-500 rounded-full w-6 h-6 flex items-center justify-center z-20">
-                  <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
+                <div className="absolute -top-2 -left-2 bg-green-500 rounded-full w-5 h-5 sm:w-4 sm:h-4 md:w-5 md:h-5 flex items-center justify-center z-20">
+                  <Check className="w-3 h-3 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 text-white" strokeWidth={2.5} />
                 </div>
               )}
               {verificationStatus === 'incorrect' && (
-                <div className="absolute -top-2 -left-2 bg-red-500 rounded-full w-6 h-6 flex items-center justify-center z-20">
-                  <X className="w-4 h-4 text-white" strokeWidth={2.5} />
+                <div className="absolute -top-2 -left-2 bg-red-500 rounded-full w-5 h-5 sm:w-4 sm:h-4 md:w-5 md:h-5 flex items-center justify-center z-20">
+                  <X className="w-3 h-3 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 text-white" strokeWidth={2.5} />
                 </div>
               )}
 
               <div className="text-center min-w-0">
-                <div className="text-xl md:text-2xl text-gray-800 mb-1 md:mb-2 font-semibold truncate">{letter}</div>
-                <div className="h-8 md:h-10 flex items-center justify-center">
+                <div className="text-lg sm:text-sm md:text-base text-gray-800 mb-1 sm:mb-0.5 font-semibold truncate">{letter}</div>
+                <div className="h-7 sm:h-5 md:h-6 flex items-center justify-center">
                   {assignments[letter] ? (
-                    <span className={`text-2xl md:text-3xl font-mono animate-fade-in ${
+                    <span className={`text-xl sm:text-sm md:text-base font-mono animate-fade-in ${
                       verificationStatus === 'correct' ? 'text-green-600' :
                       verificationStatus === 'incorrect' ? 'text-red-600' :
                       'text-purple-600'
@@ -683,18 +672,18 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                       {assignments[letter]}
                     </span>
                   ) : (
-                    <span className="text-xs md:text-sm text-gray-400">Déposez ici</span>
+                    <span className="text-xs sm:text-[9px] md:text-[10px] text-gray-400">Déposez ici</span>
                   )}
                 </div>
                 
                 {/* Domain Display - Toujours affiché sauf si la lettre est verrouillée */}
                 {!isLocked && possibleValues.length > 0 && (
-                  <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-gray-200 min-w-0">
-                    <div className="text-[10px] md:text-xs text-gray-500 mb-1 md:mb-2 font-medium flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-1">
+                  <div className="mt-2 sm:mt-1 md:mt-1.5 pt-2 sm:pt-1 md:pt-1.5 border-t border-gray-200 min-w-0">
+                    <div className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-500 mb-1 sm:mb-0.5 font-medium flex flex-col sm:flex-row items-center justify-center gap-0.5">
                       <span>Domaine</span>
-                      <span className="hidden md:inline text-[10px] text-gray-400">(clic pour éliminer)</span>
+                      <span className="hidden sm:inline text-[7px] md:text-[8px] text-gray-400">(éliminer)</span>
                     </div>
-                    <div className="flex flex-wrap gap-1 justify-center overflow-hidden">
+                    <div className="flex flex-wrap gap-1 sm:gap-0.5 justify-center overflow-hidden">
                       {possibleValues.map(val => {
                         const isEliminated = eliminatedValues[letter]?.has(val);
                         const isCurrent = hasAssignment && Number(assignments[letter]) === val;
@@ -703,7 +692,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                           <button
                             key={val}
                             onClick={(e) => toggleEliminatedValue(letter, val, e)}
-                            className={`px-1 md:px-1.5 py-0.5 rounded text-[10px] md:text-xs font-mono transition-all cursor-pointer hover:scale-110 flex-shrink-0 ${
+                            className={`px-1 sm:px-0.5 py-0.5 sm:py-0 rounded sm:rounded-sm text-[10px] sm:text-[8px] md:text-[9px] font-mono transition-all cursor-pointer hover:scale-110 flex-shrink-0 ${
                               isCurrent
                                 ? 'bg-purple-200 text-purple-800 font-semibold'
                                 : isEliminated
@@ -721,8 +710,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                 
                 {/* Empty Domain Warning */}
                 {!isLocked && possibleValues.length === 0 && (
-                  <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-red-200">
-                    <div className="text-[10px] md:text-xs text-red-600 font-medium truncate">Domaine vide !</div>
+                  <div className="mt-2 sm:mt-1 md:mt-1.5 pt-2 sm:pt-1 md:pt-1.5 border-t border-red-200">
+                    <div className="text-[10px] sm:text-[8px] md:text-[9px] text-red-600 font-medium truncate">Domaine vide !</div>
                   </div>
                 )}
               </div>
@@ -731,38 +720,31 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         })}
       </div>
 
-      {/* Espace tampon blanc pour mobile (permet de voir le domaine complet) */}
-      <div className="bg-white rounded-2xl p-8 border border-gray-200 md:hidden">
-        <p className="text-center text-gray-400 text-sm">
-          ⬆️ Scrollez pour voir tous les domaines
-        </p>
-      </div>
-
-      {/* Sticky Bar en bas (comme un "add to cart") */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
-        <div className="max-w-5xl mx-auto px-3 py-2 md:px-4 md:py-4 space-y-2 md:space-y-4">
+      {/* Sticky Bar en bas (comme un "add to cart") - Mobile uniquement */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
+        <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
           {/* Action Buttons */}
-          <div className="flex flex-row justify-center gap-2 md:gap-3">
+          <div className="flex flex-row justify-center gap-3">
             <button
               onClick={handleVerify}
-              className="flex items-center justify-center gap-1.5 md:gap-2 px-4 md:px-8 py-1.5 md:py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-xs md:text-base font-medium"
+              className="flex items-center justify-center gap-2 px-6 md:px-8 py-2.5 md:py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-sm md:text-base font-medium"
             >
-              <Check className="w-3.5 h-3.5 md:w-5 md:h-5" />
+              <Check className="w-4 h-4 md:w-5 md:h-5" />
               Vérifier
             </button>
             
             <button
               onClick={handleReset}
-              className="flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-6 py-1.5 md:py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-xs md:text-base font-medium"
+              className="flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-sm md:text-base font-medium"
             >
-              <RotateCcw className="w-3.5 h-3.5 md:w-5 md:h-5" />
+              <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
               Réinitialiser
             </button>
           </div>
 
           {/* Available Digits */}
           <div>
-            <p className="text-[10px] md:text-sm text-gray-700 mb-1.5 md:mb-2 text-center font-medium">
+            <p className="text-xs md:text-sm text-gray-700 mb-2 text-center font-medium">
               {selectedDigit 
                 ? '👆 Appuyez sur une lettre pour assigner' 
                 : touchDraggedDigit
@@ -802,6 +784,69 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                 );
               })}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Espace blanc en bas - uniquement mobile */}
+      <div className="md:hidden bg-white h-32"></div>
+
+      {/* Boutons et chiffres pour PC - Non sticky */}
+      <div className="hidden md:block mt-6 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-row justify-center gap-3">
+          <button
+            onClick={handleVerify}
+            className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+          >
+            <Check className="w-5 h-5" />
+            Vérifier
+          </button>
+          
+          <button
+            onClick={handleReset}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+          >
+            <RotateCcw className="w-5 h-5" />
+            Réinitialiser
+          </button>
+        </div>
+
+        {/* Available Digits */}
+        <div>
+          <p className="text-sm text-gray-700 mb-2 text-center font-medium">
+            {selectedDigit 
+              ? '👆 Appuyez sur une lettre pour assigner' 
+              : '✋ Cliquez sur un chiffre pour sélectionner'
+            }
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {availableDigits.map(digit => {
+              const isSelected = selectedDigit === digit;
+              const isUsed = usedDigits.has(digit);
+              
+              return (
+                <div
+                  key={digit}
+                  draggable={!isUsed}
+                  onDragStart={() => handleDragStart(digit)}
+                  onClick={() => !isUsed && handleDigitClick(digit)}
+                  className={`
+                    w-14 h-14 flex items-center justify-center rounded-xl flex-shrink-0
+                    text-2xl font-mono transition-all duration-300
+                    ${
+                      isUsed
+                        ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed'
+                        : isSelected
+                        ? 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-xl scale-110'
+                        : 'bg-gradient-to-br from-white to-gray-50 border-2 border-gray-300 text-gray-800 hover:border-purple-400 hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer cursor-move'
+                    }
+                  `}
+                >
+                  {digit}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
