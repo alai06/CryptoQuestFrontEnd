@@ -419,24 +419,27 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
               </div>
               
               {/* Score actuel avec étoiles */}
-              <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Score actuel :</p>
-                    <p className="text-[24px]">
+              <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-3 md:p-4 mb-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
+                  <div className="text-center md:text-left">
+                    <p className="text-xs md:text-[14px] font-semibold text-[#86868B] mb-1">Score actuel</p>
+                    <p className="text-xl md:text-[24px]">
                       {calculateCurrentStars() === 4 ? '🌟⭐⭐⭐' : '⭐'.repeat(calculateCurrentStars()) + '☆'.repeat(3 - calculateCurrentStars())}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[13px] text-[#86868B]">Vérifications : <span className="font-semibold text-[#1D1D1F]">{totalVerifications}</span></p>
+                  <div className="text-center md:text-right">
+                    <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#E5E5E5] mb-2 md:mb-0">
+                      <span className="text-xs md:text-[13px] text-[#86868B]">Vérifications</span>
+                      <span className="text-sm md:text-base font-bold text-[#1D1D1F]">{totalVerifications}</span>
+                    </div>
                     {calculateCurrentStars() === 4 && (
-                      <p className="text-[13px] text-[#34C759] font-medium mt-1">
-                        🌟 Parfait ! Continuez sans vérifier !
+                      <p className="text-xs md:text-[13px] text-[#34C759] font-medium mt-2">
+                        🌟 Parfait ! Continuez !
                       </p>
                     )}
                     {calculateCurrentStars() < 4 && getVerificationsUntilStarLoss() !== null && getVerificationsUntilStarLoss()! > 0 && (
-                      <p className="text-[13px] text-[#FF9500] font-medium mt-1">
-                        ⚠️ Encore {getVerificationsUntilStarLoss()} vérif avant de perdre 1★
+                      <p className="text-xs md:text-[13px] text-[#FF9500] font-medium mt-2">
+                        ⚠️ Encore {getVerificationsUntilStarLoss()} avant -1★
                       </p>
                     )}
                   </div>
@@ -549,28 +552,28 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   {completedCryptarithms.map((crypto) => (
                     <div
                       key={crypto.id}
-                      className="p-4 rounded-[12px] bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
+                      className="p-3 md:p-4 rounded-[12px] bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="w-10 h-10 rounded-[10px] bg-green-500 flex items-center justify-center">
-                            <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-[8px] md:rounded-[10px] bg-green-500 flex items-center justify-center flex-shrink-0">
+                            <Check className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
-                          <div className="flex-1">
-                            <h3 className="text-[#1D1D1F] font-semibold text-[14px]">{crypto.name}</h3>
-                            <p className="text-[#86868B] text-[13px] font-mono">{crypto.equation}</p>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-[#1D1D1F] font-semibold text-[13px] md:text-[14px] truncate">{crypto.name}</h3>
+                            <p className="text-[#86868B] text-[11px] md:text-[13px] font-mono truncate">{crypto.equation}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
                           {levelStars[crypto.id] && (
-                            <div className="flex gap-1 items-center">
+                            <div className="flex gap-0.5 md:gap-1 items-center">
                               {levelStars[crypto.id] === 4 ? (
-                                <span className="text-[18px]">🌟</span>
+                                <span className="text-[14px] md:text-[18px]">🌟</span>
                               ) : null}
                               {[1, 2, 3].map((star) => (
                                 <Star
                                   key={star}
-                                  className={`w-4 h-4 ${
+                                  className={`w-3 h-3 md:w-4 md:h-4 ${
                                     star <= (levelStars[crypto.id] === 4 ? 3 : levelStars[crypto.id] || 0)
                                       ? 'fill-[#FF9500] text-[#FF9500]'
                                       : 'text-[#E5E5E5]'
@@ -582,7 +585,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                           )}
                           <button
                             onClick={() => handleLevelSelect(crypto)}
-                            className="px-4 py-2 rounded-[8px] bg-white border border-green-300 text-green-600 text-[13px] font-medium hover:bg-green-50 active:scale-95 transition-all"
+                            className="px-3 py-1.5 md:px-4 md:py-2 rounded-[8px] bg-white border border-green-300 text-green-600 text-[11px] md:text-[13px] font-medium hover:bg-green-50 active:scale-95 transition-all whitespace-nowrap"
                           >
                             Rejouer
                           </button>
@@ -617,38 +620,38 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   onClick={() => isUnlocked && handleLevelSelect(level)}
                   disabled={!isUnlocked}
                   className={`
-                    w-full p-6 rounded-[12px] transition-all text-left border
+                    w-full p-3 md:p-6 rounded-[12px] transition-all text-left border
                     ${isUnlocked
                       ? 'bg-white border-[#E5E5E5] hover:border-[#0096BC] active:scale-[0.99]'
                       : 'bg-[#F5F5F7] border-[#E5E5E5] opacity-40 cursor-not-allowed'
                     }
                   `}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
                       <div className={`
-                        w-12 h-12 rounded-[12px] flex items-center justify-center font-semibold text-[14px]
+                        w-10 h-10 md:w-12 md:h-12 rounded-[10px] md:rounded-[12px] flex items-center justify-center font-semibold text-[12px] md:text-[14px] flex-shrink-0
                         ${isUnlocked ? 'bg-[#0096BC] text-white' : 'bg-[#E5E5E5] text-[#86868B]'}
                       `}>
-                        {isUnlocked ? `#${index + 1}` : <Lock className="w-6 h-6" strokeWidth={1.5} />}
+                        {isUnlocked ? `#${index + 1}` : <Lock className="w-4 h-4 md:w-6 md:h-6" strokeWidth={1.5} />}
                       </div>
 
-                      <div>
-                        <h3 className="text-[#1D1D1F] mb-1 font-semibold text-[16px] tracking-[-0.01em]">{level.name}</h3>
-                        <p className="text-[#86868B] text-[14px] font-mono">{level.equation}</p>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-[#1D1D1F] mb-0.5 md:mb-1 font-semibold text-[14px] md:text-[16px] tracking-[-0.01em] truncate">{level.name}</h3>
+                        <p className="text-[#86868B] text-[12px] md:text-[14px] font-mono truncate">{level.equation}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
                       {isCompleted && (
-                        <div className="flex gap-1 items-center">
+                        <div className="flex gap-0.5 md:gap-1 items-center">
                           {stars === 4 ? (
-                            <span className="text-[20px]">🌟</span>
+                            <span className="text-[16px] md:text-[20px]">🌟</span>
                           ) : null}
                           {[1, 2, 3].map((star) => (
                             <Star
                               key={star}
-                              className={`w-5 h-5 ${star <= (stars === 4 ? 3 : stars) ? 'fill-[#FF9500] text-[#FF9500]' : 'text-[#E5E5E5]'
+                              className={`w-3.5 h-3.5 md:w-5 md:h-5 ${star <= (stars === 4 ? 3 : stars) ? 'fill-[#FF9500] text-[#FF9500]' : 'text-[#E5E5E5]'
                                 }`}
                               strokeWidth={1.5}
                             />
@@ -659,13 +662,13 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                       {/* Bouton de suppression */}
                       <button
                         onClick={(e) => handleDeleteCryptarithm(level.id, e)}
-                        className="w-8 h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group"
+                        className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group flex-shrink-0"
                         aria-label="Supprimer ce cryptarithme"
                       >
-                        <X className="w-4 h-4 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={2} />
+                        <X className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={2} />
                       </button>
 
-                      {isUnlocked && <ChevronRight className="w-6 h-6 text-[#0096BC]" strokeWidth={1.5} />}
+                      {isUnlocked && <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] flex-shrink-0" strokeWidth={1.5} />}
                     </div>
                   </div>
                 </button>

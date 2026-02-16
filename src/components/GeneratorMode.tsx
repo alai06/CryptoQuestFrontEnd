@@ -311,7 +311,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
             <h2 className="text-[24px] font-bold tracking-[-0.02em]">Paramètres de génération</h2>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Operation Type */}
             <div>
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
@@ -352,7 +352,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                 onChange={(e) => handleCustomWordsTextChange(e.target.value)}
                 rows={6}
                 className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
-                placeholder={`SEND\nMORE\nMONEY`}
+                placeholder={"SEND\nMORE\nMONEY"}
               />
               <div className="flex items-center justify-between mt-2">
                 <p className="text-[#86868B] text-[12px]">
@@ -438,6 +438,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                   <p className="text-[13px] text-[#1D1D1F]">
                     <strong>Opération sélectionnée :</strong>{' '}
                     {operation === 'addition' ? 'Addition (+)' :
+                     operation === 'subtraction' ? 'Soustraction (-)' :
                      operation === 'multiplication' ? 'Multiplication (*)' :
                      operation === 'crossed' ? 'Opération croisée (CROSS)' :
                      operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}
@@ -659,23 +660,24 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
           {selectedCryptarithm && (
             <div className="mt-6 space-y-6">
-              <div className="p-8 bg-[#F5F5F7] rounded-[12px]">
-                <h3 className="text-[20px] font-semibold mb-6 text-center tracking-[-0.01em]">Cryptarithme sélectionné</h3>
-                <div className="flex justify-center mb-6">
-                  <div className="bg-white rounded-[12px] p-8 border border-[#E5E5E5]">
+              <div className="p-4 md:p-8 bg-[#F5F5F7] rounded-[12px]">
+                <h3 className="text-[18px] md:text-[20px] font-semibold mb-4 md:mb-6 text-center tracking-[-0.01em]">Cryptarithme sélectionné</h3>
+                <div className="flex justify-center mb-4 md:mb-6">
+                  <div className="bg-white rounded-[12px] p-3 md:p-8 border border-[#E5E5E5]">
                     {(() => {
                       const equation = selectedCryptarithm.equation;
+                      const sizeForDisplay = isMobile ? 'medium' : 'large';
                       // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
                       if (equation.includes('&&')) {
                         // Format CROSS: "AN + ODE = TUT && TA + TEL = SUT && ..."
                         // Prendre les 3 premières équations et les joindre avec |
                         const equations = equation.split('&&').map(eq => eq.trim());
                         const crossEquation = equations.slice(0, 3).join(' | ');
-                        return <CrossedCryptarithm equation={crossEquation} size="large" />;
+                        return <CrossedCryptarithm equation={crossEquation} size={sizeForDisplay} />;
                       } else if (equation.includes('|')) {
-                        return <CrossedCryptarithm equation={equation} size="large" />;
+                        return <CrossedCryptarithm equation={equation} size={sizeForDisplay} />;
                       } else {
-                        return <VerticalCryptarithm equation={equation} size="large" />;
+                        return <VerticalCryptarithm equation={equation} size={sizeForDisplay} />;
                       }
                     })()}
                   </div>

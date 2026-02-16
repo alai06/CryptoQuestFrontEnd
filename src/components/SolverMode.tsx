@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Play, Loader, Download, Plus, Minus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { ArrowLeft, Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
@@ -11,7 +11,7 @@ interface SolverModeProps {
   onOpenSidebar?: () => void;
 }
 
-type OperationType = 'addition' | 'subtraction' | 'multiplication' | 'crossed' | 'long-multiplication' | 'generated';
+type OperationType = 'addition' | 'multiplication' | 'crossed' | 'long-multiplication' | 'generated';
 
 const cryptarithmExamples: Record<OperationType, string[]> = {
   addition: [
@@ -20,12 +20,6 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
     'SO + MANY = HAPPY',
     'ABC + DEF = GHIJ',
     'CAT + DOG = PETS',
-  ],
-  subtraction: [
-    'SEVEN - TWO = FIVE',
-    'NINE - ONE = EIGHT',
-    'ABC - DE = FG',
-    'HAPPY - SAD = JOY',
   ],
   multiplication: [
     'AB * C = DEF',
@@ -144,19 +138,110 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   };
 
   const renderEquationWithSolution = (solution: Record<string, number>) => {
-    return equation.split('').map((char, index) => {
-      if (/[A-Z]/.test(char) && solution[char] !== undefined) {
-        return (
-          <span key={index} className="relative inline-block mx-1">
-            <span className="text-[#1D1D1F]">{char}</span>
-            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[#0096BC] text-sm font-medium">
-              {solution[char]}
-            </span>
-          </span>
-        );
+    // Diviser l'équation en parties (mots + opérateurs)
+    const parts: string[] = [];
+    let currentPart = '';
+    
+    for (let i = 0; i < equation.length; i++) {
+      const char = equation[i];
+      
+      if (/[+\-*=]/.test(char)) {
+        // Ajouter le mot actuel s'il existe
+        if (currentPart.trim()) {
+          parts.push(currentPart.trim());
+        }
+        // Ajouter l'opérateur avec le mot précédent
+        if (parts.length > 0) {
+          parts[parts.length - 1] += ' ' + char;
+        }
+        currentPart = '';
+      } else if (char === ' ') {
+        // Ignorer les espaces multiples
+        if (currentPart && currentPart[currentPart.length - 1] !== ' ') {
+          currentPart += char;
+        }
+      } else {
+        currentPart += char;
       }
-      return <span key={index}>{char}</span>;
-    });
+    }
+    
+    // Ajouter la dernière partie
+    if (currentPart.trim()) {
+      parts.push(currentPart.trim());
+    }
+    
+    // Déterminer la taille en fonction de la longueur maximale d'une partie
+    const maxLength = Math.max(...parts.map(part => part.length));
+    const getTextSizeClasses = () => {
+      if (maxLength > 15) {
+        return {
+          letter: 'text-sm md:text-[20px]',
+          digit: 'text-xs md:text-[16px]',
+          operator: 'text-sm md:text-[20px]',
+          height: 'h-[2rem] md:h-[3rem]',
+          minWidth: 'min-w-[1rem] md:min-w-[1.5rem]'
+        };
+      } else if (maxLength > 10) {
+        return {
+          letter: 'text-base md:text-[24px]',
+          digit: 'text-sm md:text-[18px]',
+          operator: 'text-base md:text-[24px]',
+          height: 'h-[2.25rem] md:h-[3.5rem]',
+          minWidth: 'min-w-[1.125rem] md:min-w-[1.75rem]'
+        };
+      } else {
+        return {
+          letter: 'text-lg md:text-[28px]',
+          digit: 'text-base md:text-[20px]',
+          operator: 'text-lg md:text-[28px]',
+          height: 'h-[2.5rem] md:h-[4rem]',
+          minWidth: 'min-w-[1.25rem] md:min-w-[2rem]'
+        };
+      }
+    };
+    
+    const sizeClasses = getTextSizeClasses();
+    
+    return (
+      <div className="flex flex-col items-center gap-3 md:gap-4 w-full overflow-x-auto">
+        {parts.map((part, partIndex) => (
+          <div key={partIndex} className="flex flex-wrap items-start justify-center gap-0.5 md:gap-1">
+            {part.split('').map((char, charIndex) => {
+              if (/[A-Z]/.test(char) && solution[char] !== undefined) {
+                return (
+                  <div key={charIndex} className={`flex flex-col items-center ${sizeClasses.minWidth}`}>
+                    <span className={`${sizeClasses.letter} text-[#1D1D1F] font-bold`}>
+                      {char}
+                    </span>
+                    <span className={`${sizeClasses.digit} text-[#0096BC] font-mono font-semibold mt-0.5 md:mt-1`}>
+                      {solution[char]}
+                    </span>
+                  </div>
+                );
+              } else if (char === ' ') {
+                return <div key={charIndex} className="w-2 md:w-3" />;
+              } else if (/[+\-*=]/.test(char)) {
+                return (
+                  <div key={charIndex} className={`flex items-center ${sizeClasses.minWidth} ${sizeClasses.height}`}>
+                    <span className={`${sizeClasses.operator} text-[#86868B] font-medium`}>
+                      {char}
+                    </span>
+                  </div>
+                );
+              } else {
+                return (
+                  <div key={charIndex} className={`flex items-center ${sizeClasses.height}`}>
+                    <span className={`${sizeClasses.letter} text-[#1D1D1F]`}>
+                      {char}
+                    </span>
+                  </div>
+                );
+              }
+            })}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -197,7 +282,6 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
             <div className="flex flex-wrap gap-2 mb-4">
               {[
                 { value: 'addition', label: 'Addition', icon: Plus },
-                { value: 'subtraction', label: 'Soustraction', icon: Minus },
                 { value: 'multiplication', label: 'Multiplication', icon: X },
                 { value: 'crossed', label: 'Opération croisée', icon: Grid3x3 },
                 { value: 'long-multiplication', label: 'Multiplication longue', icon: Grid3x3 },
@@ -385,50 +469,56 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                 </div>
 
                 {/* Equation with solution */}
-                <div className="text-2xl mb-10 font-mono text-center pb-8">
+                <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl p-8 md:p-10 border border-purple-200 mb-8">
+                  <p className="text-center text-[14px] text-[#86868B] mb-6">Équation résolue</p>
                   {renderEquationWithSolution(solutions[currentSolutionIndex])}
                 </div>
 
                 {/* Letter-Digit Mapping */}
-                <div className="grid grid-cols-5 gap-3 mb-6">
-                  {Object.entries(solutions[currentSolutionIndex]).map(([letter, digit]) => (
-                    <div
-                      key={letter}
-                      className="bg-white rounded-[12px] p-4 text-center border border-[#E5E5E5]"
-                    >
-                      <div className="text-[16px] text-[#86868B] mb-1">{letter}</div>
-                      <div className="text-[24px] text-[#0096BC] font-mono font-semibold">{digit}</div>
-                    </div>
-                  ))}
+                <div className="mb-8">
+                  <p className="text-center text-[14px] text-[#86868B] mb-4">Correspondance lettre → chiffre</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
+                    {Object.entries(solutions[currentSolutionIndex])
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([letter, digit]) => (
+                        <div
+                          key={letter}
+                          className="bg-white rounded-[12px] p-2 md:p-4 text-center border border-[#E5E5E5] hover:border-[#0096BC] transition-colors"
+                        >
+                          <div className="text-xs md:text-[16px] text-[#86868B] mb-0.5 md:mb-1 font-medium">{letter}</div>
+                          <div className="text-lg md:text-[32px] text-[#0096BC] font-mono font-bold">{digit}</div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               </div>
 
               {/* All Solutions Grid - Compact View */}
               {solutions.length > 1 && (
-                <div>
+                <div className="mb-8">
                   <p className="text-[14px] text-[#86868B] mb-3">Toutes les solutions ({solutions.length})</p>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {solutions.map((solution, index) => (
                       <button
                         key={index}
                         onClick={() => setCurrentSolutionIndex(index)}
                         className={`
-                          p-4 rounded-[12px] border transition-all text-left
+                          p-3 md:p-4 rounded-[12px] border transition-all text-left
                           ${currentSolutionIndex === index
                             ? 'border-[#0096BC] bg-[#E8F7FB]'
                             : 'border-[#E5E5E5] bg-white hover:border-[#0096BC]/40'
                           }
                         `}
                       >
-                        <div className="text-[12px] text-[#86868B] mb-2">Solution {index + 1}</div>
+                        <div className="text-[11px] md:text-[12px] text-[#86868B] mb-2 font-medium">Solution {index + 1}</div>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(solution).slice(0, 4).map(([letter, digit]) => (
-                            <span key={letter} className="text-[11px] font-mono text-[#1D1D1F]">
+                            <span key={letter} className="text-[10px] md:text-[11px] font-mono text-[#1D1D1F] bg-[#F5F5F7] px-1.5 py-0.5 rounded">
                               {letter}={digit}
                             </span>
                           ))}
                           {Object.keys(solution).length > 4 && (
-                            <span className="text-[11px] text-[#86868B]">+{Object.keys(solution).length - 4}</span>
+                            <span className="text-[10px] md:text-[11px] text-[#86868B]">+{Object.keys(solution).length - 4}</span>
                           )}
                         </div>
                       </button>
