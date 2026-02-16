@@ -454,6 +454,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
               onVerification={handleVerification}
               showHints={showHint}
               easyMode={isEasyMode}
+              isMobile={isMobile}
             />
           </div>
         </div>

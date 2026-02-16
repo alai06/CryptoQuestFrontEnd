@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, X, RotateCcw, Lightbulb, AlertCircle } from 'lucide-react';
 import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
 
@@ -9,9 +9,10 @@ interface DragDropBoardProps {
   onVerification?: () => void;
   showHints?: boolean;
   easyMode?: boolean;
+  isMobile?: boolean;
 }
 
-export default function DragDropBoard({ equation, solution, onSolved, onVerification, showHints = false, easyMode = false }: DragDropBoardProps) {
+export default function DragDropBoard({ equation, solution, onSolved, onVerification, showHints = false, easyMode = false, isMobile = false }: DragDropBoardProps) {
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [letterDomains, setLetterDomains] = useState<Record<string, Set<number>>>({});
   const [verifiedLetters, setVerifiedLetters] = useState<Record<string, 'correct' | 'incorrect' | null>>({});
@@ -373,8 +374,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   };
 
   const renderEquation = () => {
-    const parts: JSX.Element[] = [];
-    let currentWord: JSX.Element[] = [];
+    const parts: React.ReactNode[] = [];
+    let currentWord: React.ReactNode[] = [];
     let wordIndex = 0;
 
     equation.split('').forEach((char, index) => {
@@ -389,13 +390,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
               isHighlighted ? 'scale-110' : ''
             }`}
           >
-            <span className={`text-base md:text-3xl lg:text-5xl text-gray-800 font-mono ${
+            <span className={`text-base md:text-3xl lg:text-8xl text-gray-800 font-mono lg:font-bold ${
               isHighlighted ? 'text-purple-600 animate-pulse' : ''
             }`}>
               {char}
             </span>
             {hasAssignment && (
-              <span className="absolute -bottom-6 md:-bottom-12 lg:-bottom-16 left-1/2 -translate-x-1/2 text-sm md:text-2xl lg:text-3xl text-purple-600 font-mono animate-fade-in">
+              <span className="absolute -bottom-6 md:-bottom-12 lg:-bottom-20 left-1/2 -translate-x-1/2 text-sm md:text-2xl lg:text-5xl text-purple-600 font-mono lg:font-bold animate-fade-in">
                 {hasAssignment}
               </span>
             )}
@@ -415,7 +416,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         
         // Ajouter l'espace ou l'opérateur
         parts.push(
-          <span key={`op-${index}`} className="text-base md:text-3xl lg:text-5xl text-gray-800 font-mono px-0.5">
+          <span key={`op-${index}`} className="text-base md:text-3xl lg:text-8xl text-gray-800 font-mono lg:font-bold px-0.5">
             {char}
           </span>
         );
@@ -590,7 +591,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       </div>
 
       {/* Letter Assignment Zones */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-2.5 md:gap-3">
+      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} gap-3 sm:gap-2.5 md:gap-3`}>
         {letters.map(letter => {
           const isHighlighted = highlightedLetters.has(letter);
           const isSelected = selectedLetter === letter;
@@ -678,12 +679,12 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                 
                 {/* Domain Display - Toujours affiché sauf si la lettre est verrouillée */}
                 {!isLocked && possibleValues.length > 0 && (
-                  <div className="mt-2 sm:mt-1 md:mt-1.5 pt-2 sm:pt-1 md:pt-1.5 border-t border-gray-200 min-w-0">
-                    <div className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-500 mb-1 sm:mb-0.5 font-medium flex flex-col sm:flex-row items-center justify-center gap-0.5">
+                  <div className={`mt-2 pt-2 border-t border-gray-200 min-w-0 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
+                    <div className={`text-gray-500 font-medium flex items-center justify-center gap-1 ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px] mb-1 sm:mb-0.5 flex-col sm:flex-row' : 'text-[11px] mb-2'}`}>
                       <span>Domaine</span>
-                      <span className="hidden sm:inline text-[7px] md:text-[8px] text-gray-400">(éliminer)</span>
+                      <span className={`text-gray-400 ${isMobile ? 'hidden sm:inline text-[7px] md:text-[8px]' : 'text-[9px]'}`}>(cliquer pour éliminer)</span>
                     </div>
-                    <div className="flex flex-wrap gap-1 sm:gap-0.5 justify-center overflow-hidden">
+                    <div className={`flex flex-wrap justify-center overflow-hidden ${isMobile ? 'gap-1 sm:gap-0.5' : 'gap-1.5'}`}>
                       {possibleValues.map(val => {
                         const isEliminated = eliminatedValues[letter]?.has(val);
                         const isCurrent = hasAssignment && Number(assignments[letter]) === val;
@@ -692,12 +693,22 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                           <button
                             key={val}
                             onClick={(e) => toggleEliminatedValue(letter, val, e)}
-                            className={`px-1 sm:px-0.5 py-0.5 sm:py-0 rounded sm:rounded-sm text-[10px] sm:text-[8px] md:text-[9px] font-mono transition-all cursor-pointer hover:scale-110 flex-shrink-0 ${
+                            className={`font-mono transition-all cursor-pointer flex-shrink-0 ${
+                              isMobile
+                                ? `px-1 sm:px-0.5 py-0.5 sm:py-0 rounded sm:rounded-sm text-[10px] sm:text-[8px] md:text-[9px] hover:scale-110`
+                                : `w-7 h-7 flex items-center justify-center rounded-lg text-[12px] hover:scale-110 shadow-sm border`
+                            } ${
                               isCurrent
-                                ? 'bg-purple-200 text-purple-800 font-semibold'
+                                ? isMobile
+                                  ? 'bg-purple-200 text-purple-800 font-semibold'
+                                  : 'bg-purple-100 text-purple-700 font-bold border-purple-300 ring-2 ring-purple-300'
                                 : isEliminated
-                                ? 'bg-red-100 text-red-400 line-through opacity-50'
-                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                ? isMobile
+                                  ? 'bg-red-100 text-red-400 line-through opacity-50'
+                                  : 'bg-red-50 text-red-300 line-through opacity-40 border-red-200'
+                                : isMobile
+                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200 hover:border-blue-400 hover:shadow-md'
                             }`}
                           >
                             {val}
@@ -710,8 +721,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                 
                 {/* Empty Domain Warning */}
                 {!isLocked && possibleValues.length === 0 && (
-                  <div className="mt-2 sm:mt-1 md:mt-1.5 pt-2 sm:pt-1 md:pt-1.5 border-t border-red-200">
-                    <div className="text-[10px] sm:text-[8px] md:text-[9px] text-red-600 font-medium truncate">Domaine vide !</div>
+                  <div className={`mt-2 pt-2 border-t border-red-200 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
+                    <div className={`text-red-600 font-medium truncate ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px]' : 'text-[11px]'}`}>Domaine vide !</div>
                   </div>
                 )}
               </div>
@@ -720,8 +731,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         })}
       </div>
 
-      {/* Sticky Bar en bas (comme un "add to cart") - Mobile uniquement */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
+      {/* Sticky Bar en bas - Mobile uniquement */}
+      {isMobile && <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
         <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
           {/* Action Buttons */}
           <div className="flex flex-row justify-center gap-3">
@@ -786,13 +797,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Espace blanc en bas - uniquement mobile */}
-      <div className="md:hidden bg-white h-32"></div>
+      {isMobile && <div className="bg-white h-32"></div>}
 
-      {/* Boutons et chiffres pour PC - Non sticky */}
-      <div className="hidden md:block mt-6 space-y-4">
+      {/* Boutons et chiffres pour PC - intégré au bloc */}
+      {!isMobile && <div className="mt-6 space-y-4">
         {/* Action Buttons */}
         <div className="flex flex-row justify-center gap-3">
           <button
@@ -849,7 +860,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
             })}
           </div>
         </div>
-      </div>
+      </div>}
 
       {showHints && (
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl md:rounded-2xl p-4 md:p-5 text-center text-blue-900 shadow-lg animate-fade-in mx-2">
