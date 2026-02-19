@@ -131,7 +131,7 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[13px] text-[#86868B]">Niveaux</span>
-                    <span className="text-[18px] font-bold text-[#1D1D1F]">{completedLevels}<span className="text-[14px] text-[#86868B] font-normal">/5</span></span>
+                    <span className="text-[18px] font-bold text-[#1D1D1F]">{completedLevels}</span>
                   </div>
                   <div className="h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
                     <div 

@@ -296,7 +296,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
         {/* Generation Progress */}
         {generated.length > 0 && (
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-4 mb-6">
+          <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-4 mb-6"}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[14px] font-medium text-[#1D1D1F]">Cryptarithmes générés</span>
               <span className={`text-[14px] font-medium ${generated.length >= MAX_CRYPTARITHMS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
@@ -318,7 +318,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         )}
 
         {/* Configuration Panel */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
+        <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6"}>
           {/* Back Button - Mobile only */}
           {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
@@ -599,7 +599,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
         {/* Custom Words Display */}
         {customWords.length > 0 && (
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6">
+          <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6"}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[20px] font-semibold tracking-[-0.01em]">Mots validés ({customWords.length}/{MAX_CUSTOM_WORDS})</h3>
               <button
@@ -628,7 +628,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
 
         {/* Generated List */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8"}>
           <h2 className="text-[24px] font-bold mb-6 tracking-[-0.02em]">Cryptarithmes générés</h2>
 
           {generated.length === 0 ? (
@@ -717,7 +717,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               </div>
               
               {/* Affichage de la solution */}
-              <div className="p-8 bg-white rounded-[12px] border border-[#E5E5E5]">
+              <div className={isMobile ? "p-4" : "p-8 bg-white rounded-[12px] border border-[#E5E5E5]"}>
                 <h3 className="text-[20px] font-semibold mb-6 tracking-[-0.01em]">Solution</h3>
                 <SolutionDisplay 
                   solution={selectedCryptarithm.solution} 

@@ -267,7 +267,7 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         )}
 
         {/* Main Container */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-10"}>
           {/* Back Button - Mobile only */}
           {isMobile && <BackButtonWithProgress onBack={onBack} />}
 

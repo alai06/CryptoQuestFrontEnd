@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Home, BookOpen, Lightbulb, Wand2, Gamepad2, Trophy } from 'lucide-react';
 import NavigationMenu from './components/NavigationMenu';
-import Mobile2048HomeScreen from './components/Mobile2048HomeScreen';
+import MobileHomeScreen from './components/MobileHomeScreen';
 import Mobile2048Sidebar from './components/Mobile2048Sidebar';
 import HomeScreen from './components/HomeScreen';
 import TutorialMode from './components/TutorialMode';
@@ -89,11 +89,10 @@ export default function App() {
       switch (currentScreen) {
         case 'home':
           return (
-            <Mobile2048HomeScreen 
+            <MobileHomeScreen 
               onNavigate={setCurrentScreen} 
               tutorialCompleted={tutorialCompleted}
               stats={userStats}
-              isLoading={isLoading}
               language={language}
               onLanguageChange={handleLanguageChange}
               onOpenSidebar={() => setIsSidebarExpanded(true)}
@@ -111,11 +110,10 @@ export default function App() {
           return <ProgressDashboard onBack={() => setCurrentScreen('home')} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         default:
           return (
-            <Mobile2048HomeScreen 
+            <MobileHomeScreen 
               onNavigate={setCurrentScreen} 
               tutorialCompleted={tutorialCompleted}
               stats={userStats}
-              isLoading={isLoading}
               language={language}
               onLanguageChange={handleLanguageChange}
               onOpenSidebar={() => setIsSidebarExpanded(true)}

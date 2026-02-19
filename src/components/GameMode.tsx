@@ -419,7 +419,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
           </div>
 
           {/* Game Board */}
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">
+          <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8"}>
             <div className="mb-8">
               <h2 className="text-[24px] font-bold mb-2 tracking-[-0.02em]">{selectedLevel.name}</h2>
               <div className="flex items-center gap-2 mb-4">
@@ -508,7 +508,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-10"}>
           {/* Back Button - Mobile only */}
           {isMobile && (
             <button
@@ -547,10 +547,10 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
 
           {/* Section Cryptarithmes terminés (dépliable) */}
           {completedCryptarithms.length > 0 && (
-            <div className="bg-white rounded-[12px] border border-[#E5E5E5] mb-6">
+            <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] mb-6"}>
               <button
                 onClick={() => setShowCompletedSection(!showCompletedSection)}
-                className="w-full p-6 rounded-[12px] transition-all text-left hover:bg-[#F5F5F7]"
+                className={isMobile ? "w-full p-4 rounded-[12px] transition-all text-left" : "w-full p-6 rounded-[12px] transition-all text-left hover:bg-[#F5F5F7]"}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">

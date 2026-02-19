@@ -93,7 +93,7 @@ export default function TutorialMode({ onComplete, onBack, isMobile = false, onO
         </div>
 
         {/* Main Card */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-5 md:p-10">
+        <div className={isMobile ? "p-2" : "bg-white rounded-[12px] border border-[#E5E5E5] p-5 md:p-10"}>
           {/* Back Button - Mobile only */}
           {isMobile && (
             <button
