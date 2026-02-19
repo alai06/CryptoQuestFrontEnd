@@ -436,7 +436,6 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
 
           {/* Game Info */}
           <div className="mb-4">
-            <h2 className="text-[24px] font-bold mb-2 tracking-[-0.02em]">{selectedLevel.name}</h2>
             <div className="flex items-center gap-2 mb-4">
               <span className={`
                 px-3 py-1 rounded-full text-[14px] font-medium
@@ -690,8 +689,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
                             <Check className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-[#1D1D1F] font-semibold text-[13px] md:text-[14px] truncate">{crypto.name}</h3>
-                            <p className="text-[#86868B] text-[11px] md:text-[13px] font-mono truncate">{crypto.equation}</p>
+                            <p className="text-[#1D1D1F] text-[13px] md:text-[14px] font-mono truncate font-semibold">{crypto.equation}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
@@ -767,8 +765,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[#1D1D1F] mb-0.5 md:mb-1 font-semibold text-[14px] md:text-[16px] tracking-[-0.01em] truncate">{level.name}</h3>
-                        <p className="text-[#86868B] text-[12px] md:text-[14px] font-mono truncate">{level.equation}</p>
+                        <p className="text-[#1D1D1F] text-[14px] md:text-[16px] font-mono truncate font-semibold">{level.equation}</p>
                       </div>
                     </div>
 
