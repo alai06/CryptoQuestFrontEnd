@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, RotateCcw, Lightbulb, AlertCircle } from 'lucide-react';
+import { Check, X, RotateCcw, Lightbulb, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
 
 interface DragDropBoardProps {
@@ -25,6 +25,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highlightedLetters, setHighlightedLetters] = useState<Set<string>>(new Set());
   const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({});
+  const [expandedLetters, setExpandedLetters] = useState<Record<string, boolean>>({}); // État pour afficher/masquer les domaines par lettre
   
   // États pour le support tactile mobile
   const [touchDraggedDigit, setTouchDraggedDigit] = useState<string | null>(null);
@@ -514,7 +515,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     } else if (incorrectCount > 0 && correctCount > 0) {
       setHintMessage(`${correctCount} correct(s), ${incorrectCount} incorrect(s). Les chiffres incorrects ont été retirés.`);
     } else if (incorrectCount > 0) {
-      setHintMessage(`✗ Aucune attribution correcte. Les chiffres incorrects ont été retirés et les domaines mis à jour.`);
+      setHintMessage(`✗ Aucune attribution correcte. Les chiffres incorrects ont été retirés et les valeurs possibles mises à jour.`);
     }
 
     // Notifier le parent qu'une vérification a été effectuée
@@ -612,6 +613,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           // Filtrer avec les domaines stockés (qui sont réduits lors de la vérification)
           const storedDomain = letterDomains[letter] || new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
           const possibleValues = constraints.possibleValues.filter(val => storedDomain.has(val));
+          const isExpanded = expandedLetters[letter] ?? false;
           
           return (
             <div
@@ -677,14 +679,28 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                   )}
                 </div>
                 
-                {/* Domain Display - Toujours affiché sauf si la lettre est verrouillée */}
+                {/* Domain Toggle Button & Display */}
                 {!isLocked && possibleValues.length > 0 && (
                   <div className={`mt-2 pt-2 border-t border-gray-200 min-w-0 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
-                    <div className={`text-gray-500 font-medium flex items-center justify-center gap-1 ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px] mb-1 sm:mb-0.5 flex-col sm:flex-row' : 'text-[11px] mb-2'}`}>
-                      <span>Domaine</span>
-                      <span className={`text-gray-400 ${isMobile ? 'hidden sm:inline text-[7px] md:text-[8px]' : 'text-[9px]'}`}>(cliquer pour éliminer)</span>
-                    </div>
-                    <div className={`flex flex-wrap justify-center overflow-hidden ${isMobile ? 'gap-1 sm:gap-0.5' : 'gap-1.5'}`}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedLetters(prev => ({ ...prev, [letter]: !isExpanded }));
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 text-gray-600 hover:text-gray-800 transition-colors mb-1.5"
+                    >
+                      <span className={`text-[10px] font-medium ${isMobile ? 'text-[9px]' : ''}`}>
+                        Domaine : {possibleValues.length} valeur{possibleValues.length > 1 ? 's' : ''}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className={`flex flex-wrap justify-center ${isMobile ? 'gap-2 sm:gap-1.5 md:gap-2 leading-relaxed' : 'gap-1 leading-relaxed'}`}>
                       {possibleValues.map(val => {
                         const isEliminated = eliminatedValues[letter]?.has(val);
                         const isCurrent = hasAssignment && Number(assignments[letter]) === val;
@@ -695,8 +711,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                             onClick={(e) => toggleEliminatedValue(letter, val, e)}
                             className={`font-mono transition-all cursor-pointer flex-shrink-0 ${
                               isMobile
-                                ? `px-1 sm:px-0.5 py-0.5 sm:py-0 rounded sm:rounded-sm text-[10px] sm:text-[8px] md:text-[9px] hover:scale-110`
-                                : `w-7 h-7 flex items-center justify-center rounded-lg text-[12px] hover:scale-110 shadow-sm border`
+                                ? `px-2 py-1 rounded text-[11px] sm:text-[10px] md:text-[11px] hover:scale-105 min-w-[32px]`
+                                : `px-2 py-1 rounded-lg text-[11px] hover:scale-105 shadow-sm border min-w-[28px]`
                             } ${
                               isCurrent
                                 ? isMobile
@@ -715,14 +731,17 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                           </button>
                         );
                       })}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {/* Empty Domain Warning */}
                 {!isLocked && possibleValues.length === 0 && (
                   <div className={`mt-2 pt-2 border-t border-red-200 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
-                    <div className={`text-red-600 font-medium truncate ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px]' : 'text-[11px]'}`}>Domaine vide !</div>
+                    <div className={`text-center text-red-600 font-medium ${isMobile ? 'text-[9px]' : 'text-[10px]'}`}>
+                      <span className="text-[9px] text-gray-500">Domaine : </span>⚠️ Aucune valeur
+                    </div>
                   </div>
                 )}
               </div>
@@ -869,8 +888,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           </p>
           <ul className="text-xs md:text-sm space-y-1 text-left max-w-2xl mx-auto">
             <li>• Les lettres en début de mot ne peuvent pas être 0</li>
-            <li className="hidden md:list-item">• Cliquez sur une valeur du domaine pour l'éliminer manuellement (comme les drapeaux du démineur)</li>
-            <li className="md:hidden">• Cliquez sur une valeur du domaine pour l'éliminer</li>
+            <li className="hidden md:list-item">• Cliquez sur une valeur possible pour l'éliminer manuellement (comme les drapeaux du démineur)</li>
+            <li className="md:hidden">• Cliquez sur une valeur possible pour l'éliminer</li>
             <li>• Cliquez sur un chiffre pour voir où il peut aller</li>
             {easyMode && <li>• En mode facile, les mauvaises décisions sont bloquées</li>}
           </ul>

@@ -88,6 +88,23 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     return 0; // Déjà à 1 étoile
   };
 
+  // Noms originaux pour les cryptarithmes générés
+  const cryptarithmNames = [
+    'Énigme Divine', 'Puzzle Mystique', 'Défi Céleste', 'Casse-tête Magique',
+    'Mystère Numérique', 'Équation Cosmique', 'Rébus Astral', 'Énigme Lunaire',
+    'Puzzle Stellaire', 'Défi des Sages', 'Mystère Sacré', 'Énigme Éternelle',
+    'Puzzle d\'Hermès', 'Défi d\'Archimède', 'Mystère d\'Euclide', 'Énigme de Pythagore',
+    'Puzzle de Gauss', 'Défi de Fermat', 'Mystère de Pascal', 'Énigme de Fibonacci',
+    'Puzzle Ancestral', 'Défi Légendaire', 'Mystère Millénaire', 'Énigme Antique',
+    'Puzzle Impérial', 'Défi Royal', 'Mystère du Sphinx', 'Énigme d\'Alexandrie',
+    'Puzzle de Babel', 'Défi Olympien', 'Mystère d\'Atlantis', 'Énigme de Thulé',
+    'Puzzle Runique', 'Défi des Druides', 'Mystère Celtique', 'Énigme Nordique',
+    'Puzzle du Dragon', 'Défi du Phénix', 'Mystère du Griffon', 'Énigme de la Licorne',
+    'Puzzle Alchimique', 'Défi Hermétique', 'Mystère Ésotérique', 'Énigme Cabalistique',
+    'Puzzle Zen', 'Défi du Lotus', 'Mystère du Mandala', 'Énigme du Tao',
+    'Puzzle Stellaire', 'Défi Galactique', 'Mystère Cosmique', 'Énigme Sidérale'
+  ];
+
   // Charger les cryptarithmes générés depuis localStorage
   useEffect(() => {
     const loadGeneratedCryptarithms = () => {
@@ -125,7 +142,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
               
               return {
                 id: 1000 + index, // ID unique pour les niveaux générés
-                name: `Cryptarithme #${index + 1}`,
+                name: cryptarithmNames[index % cryptarithmNames.length],
                 equation: crypto.equation,
                 solution: solutionMap,
                 timeLimit: 300,
@@ -470,20 +487,14 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
           <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
             <div className="flex items-center justify-between">
               <button
-                onClick={onBack}
-                className="w-10 h-10 rounded-xl bg-[#F5F5F7] flex items-center justify-center active:scale-95 transition-transform"
-                aria-label="Retour"
-              >
-                <ArrowLeft className="w-5 h-5 text-[#1D1D1F]" strokeWidth={2} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Mode Aventure</h1>
-              <button
                 onClick={onOpenSidebar}
                 className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
                 aria-label="Menu"
               >
                 <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
               </button>
+              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Mode Aventure</h1>
+              <div className="w-10 h-10"></div>
             </div>
           </div>
         )}
@@ -498,6 +509,18 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
 
         {/* Main Content */}
         <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
+          {/* Back Button - Mobile only */}
+          {isMobile && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-[#86868B] hover:text-[#1D1D1F] transition-colors group mb-6"
+              aria-label="Retour"
+            >
+              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+              <span className="text-[14px] font-medium">Retour</span>
+            </button>
+          )}
+          
           <h1 className="text-[32px] font-bold mb-2 tracking-[-0.02em]">Mode Aventure</h1>
           <p className="text-[14px] text-[#86868B] mb-10">
             Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <span className="font-semibold text-[#0096BC]">Génération</span> pour enrichir votre collection.
@@ -666,7 +689,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                         className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group flex-shrink-0"
                         aria-label="Supprimer ce cryptarithme"
                       >
-                        <X className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={2} />
+                        <X className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={1.5} />
                       </button>
 
                       {isUnlocked && <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] flex-shrink-0" strokeWidth={1.5} />}

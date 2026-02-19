@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
-import { generateCryptarithms as generateCryptarithmsAPI } from '../services/cryptatorApi';
+import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
 import BackButtonWithProgress from './BackButtonWithProgress';
@@ -47,6 +47,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
   const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
+  const API_LIMITS = getApiLimits();
 
     // Charger les cryptarithmes sauvegardés au démarrage
   useEffect(() => {
@@ -450,22 +451,36 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Solution Limit */}
-                  <NumberInput
-                    label="Limite de solutions"
-                    value={solutionLimit}
-                    onChange={(val) => setSolutionLimit(val ?? 5)}
-                    min={1}
-                    max={100}
-                  />
+                  <div>
+                    <NumberInput
+                      label="Limite de solutions"
+                      value={solutionLimit}
+                      onChange={(val) => setSolutionLimit(val ?? 5)}
+                      min={1}
+                      max={API_LIMITS.maxSolutionsPerRequest}
+                    />
+                    {solutionLimit > API_LIMITS.maxSolutionsPerRequest && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ Maximum {API_LIMITS.maxSolutionsPerRequest} solutions par requête
+                      </p>
+                    )}
+                  </div>
 
                   {/* Time Limit */}
-                  <NumberInput
-                    label="Temps limite (secondes)"
-                    value={timeLimit}
-                    onChange={(val) => setTimeLimit(val ?? 60)}
-                    min={1}
-                    max={300}
-                  />
+                  <div>
+                    <NumberInput
+                      label="Temps limite (secondes)"
+                      value={timeLimit}
+                      onChange={(val) => setTimeLimit(val ?? 60)}
+                      min={1}
+                      max={API_LIMITS.maxTimeLimit}
+                    />
+                    {timeLimit > API_LIMITS.maxTimeLimit && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ Maximum {API_LIMITS.maxTimeLimit} secondes par requête
+                      </p>
+                    )}
+                  </div>
 
                   {/* Right Member Type */}
                   <SelectField

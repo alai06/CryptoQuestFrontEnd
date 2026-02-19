@@ -2,7 +2,10 @@
  * Cryptator API Service
  * Handles communication with the external cryptator-api server
  * API runs on http://localhost:8090
+ * Includes rate limiting and security features to prevent API bombardment
  */
+
+import { rateLimiter, createCacheKey } from './rateLimiter';
 
 const API_BASE_URL = 'http://localhost:8090/api/v1';
 
@@ -74,6 +77,11 @@ export interface GenerateResponse {
     taskId?: string;
 }
 
+// ==================== Configuration ====================
+
+const MAX_SOLUTIONS_PER_REQUEST = 10;
+const MAX_TIME_LIMIT = 120; // 2 minutes max
+
 // ==================== API Functions ====================
 
 /**
@@ -83,41 +91,57 @@ export interface GenerateResponse {
  * @throws Error if API is unreachable or returns an error
  */
 export async function solveCryptarithm(request: SolveRequest): Promise<SolveResponse> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/cryptator/solve`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                cryptarithm: request.cryptarithm,
-                solverType: request.solverType || 'SCALAR',
-                solutionLimit: request.solutionLimit ?? 0,
-                timeLimit: request.timeLimit ?? 0,
-                arithmeticBase: request.arithmeticBase ?? 10,
-                checkSolution: request.checkSolution ?? false,
-                exportGraphviz: request.exportGraphviz ?? false,
-                allowLeadingZeros: request.allowLeadingZeros ?? false,
-                hornerScheme: request.hornerScheme ?? false,
-                assignments: request.assignments,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
-        }
-
-        const data: SolveResponse = await response.json();
-        return data;
-    } catch (error) {
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-            throw new Error(
-                "Impossible de se connecter à l'API. Assurez-vous que le serveur cryptator-api est démarré sur le port 8090."
-            );
-        }
-        throw error;
+    // Validation des limites
+    if (request.solutionLimit && request.solutionLimit > MAX_SOLUTIONS_PER_REQUEST) {
+        throw new Error(`Limite de solutions dépassée. Maximum: ${MAX_SOLUTIONS_PER_REQUEST} solutions par requête.`);
     }
+    if (request.timeLimit && request.timeLimit > MAX_TIME_LIMIT) {
+        throw new Error(`Limite de temps dépassée. Maximum: ${MAX_TIME_LIMIT} secondes par requête.`);
+    }
+    const endpoint = '/cryptator/solve';
+    const cacheKey = createCacheKey(endpoint, request);
+
+    return rateLimiter.execute(
+        async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cryptarithm: request.cryptarithm,
+                        solverType: request.solverType || 'SCALAR',
+                        solutionLimit: request.solutionLimit ?? 0,
+                        timeLimit: request.timeLimit ?? 0,
+                        arithmeticBase: request.arithmeticBase ?? 10,
+                        checkSolution: request.checkSolution ?? false,
+                        exportGraphviz: request.exportGraphviz ?? false,
+                        allowLeadingZeros: request.allowLeadingZeros ?? false,
+                        hornerScheme: request.hornerScheme ?? false,
+                        assignments: request.assignments,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+                }
+
+                const data: SolveResponse = await response.json();
+                return data;
+            } catch (error) {
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                    throw new Error(
+                        "Impossible de se connecter à l'API. Assurez-vous que le serveur cryptator-api est démarré sur le port 8090."
+                    );
+                }
+                throw error;
+            }
+        },
+        endpoint,
+        cacheKey
+    );
 }
 
 /**
@@ -127,48 +151,65 @@ export async function solveCryptarithm(request: SolveRequest): Promise<SolveResp
  * @throws Error if API is unreachable or returns an error
  */
 export async function generateCryptarithms(request: GenerateRequest): Promise<GenerateResponse> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/cryptagen/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                words: request.words,
-                operatorSymbol: request.operatorSymbol || '+',
-                solutionLimit: request.solutionLimit ?? 5,
-                timeLimit: request.timeLimit ?? 60,
-                shuffle: request.shuffle ?? false,
-                countryCode: request.countryCode,
-                langCode: request.langCode,
-                lowerBound: request.lowerBound,
-                upperBound: request.upperBound,
-                dryRun: request.dryRun ?? false,
-                rightMemberType: request.rightMemberType || 'UNIQUE',
-                minWords: request.minWords,
-                maxWords: request.maxWords,
-                lightPropagation: request.lightPropagation ?? false,
-                threads: request.threads ?? 1,
-                crossGridSize: request.crossGridSize,
-                allowLeadingZeros: request.allowLeadingZeros ?? false,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
-        }
-
-        const data: GenerateResponse = await response.json();
-        return data;
-    } catch (error) {
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-            throw new Error(
-                "Impossible de se connecter à l'API. Assurez-vous que le serveur cryptator-api est démarré sur le port 8090."
-            );
-        }
-        throw error;
+    // Validation des limites
+    if (request.solutionLimit && request.solutionLimit > MAX_SOLUTIONS_PER_REQUEST) {
+        throw new Error(`Limite de génération dépassée. Maximum: ${MAX_SOLUTIONS_PER_REQUEST} cryptarithmes par requête.`);
     }
+    if (request.timeLimit && request.timeLimit > MAX_TIME_LIMIT) {
+        throw new Error(`Limite de temps dépassée. Maximum: ${MAX_TIME_LIMIT} secondes par requête.`);
+    }
+    const endpoint = '/cryptagen/generate';
+    const cacheKey = createCacheKey(endpoint, request);
+
+    return rateLimiter.execute(
+        async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        words: request.words,
+                        operatorSymbol: request.operatorSymbol || '+',
+                        solutionLimit: request.solutionLimit ?? 5,
+                        timeLimit: request.timeLimit ?? 60,
+                        shuffle: request.shuffle ?? false,
+                        countryCode: request.countryCode,
+                        langCode: request.langCode,
+                        lowerBound: request.lowerBound,
+                        upperBound: request.upperBound,
+                        dryRun: request.dryRun ?? false,
+                        rightMemberType: request.rightMemberType || 'UNIQUE',
+                        minWords: request.minWords,
+                        maxWords: request.maxWords,
+                        lightPropagation: request.lightPropagation ?? false,
+                        threads: request.threads ?? 1,
+                        crossGridSize: request.crossGridSize,
+                        allowLeadingZeros: request.allowLeadingZeros ?? false,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+                }
+
+                const data: GenerateResponse = await response.json();
+                return data;
+            } catch (error) {
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                    throw new Error(
+                        "Impossible de se connecter à l'API. Assurez-vous que le serveur cryptator-api est démarré sur le port 8090."
+                    );
+                }
+                throw error;
+            }
+        },
+        endpoint,
+        cacheKey,
+        1 // Priorité plus haute pour la génération
+    );
 }
 
 /**
@@ -185,3 +226,41 @@ export async function checkApiHealth(): Promise<boolean> {
         return false;
     }
 }
+
+// ==================== Rate Limiting Functions ====================
+
+/**
+ * Get current rate limiting statistics
+ */
+export function getRateLimitStats() {
+    return rateLimiter.getUsageStats();
+}
+
+/**
+ * Reset rate limiter (clears history and cache)
+ */
+export function resetRateLimiter() {
+    rateLimiter.reset();
+}
+
+/**
+ * Clear only the cache
+ */
+export function clearApiCache() {
+    rateLimiter.clearCache();
+}
+
+/**
+ * Get API limits
+ */
+export function getApiLimits() {
+    return {
+        maxSolutionsPerRequest: MAX_SOLUTIONS_PER_REQUEST,
+        maxTimeLimit: MAX_TIME_LIMIT,
+    };
+}
+
+/**
+ * Export the rate limiter instance for advanced usage
+ */
+export { rateLimiter };

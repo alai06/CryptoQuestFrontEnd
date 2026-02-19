@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
-import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
+import { solveCryptarithm as solveCryptarithmAPI, getApiLimits } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
 
@@ -55,6 +55,8 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   const [allowLeadingZeros, setAllowLeadingZeros] = useState<boolean>(false);
   const [hornerScheme, setHornerScheme] = useState<boolean>(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+
+  const API_LIMITS = getApiLimits();
 
   const handleSolve = async () => {
     if (!equation.trim()) {
@@ -363,24 +365,38 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                 />
 
                 {/* Solution Limit */}
-                <NumberInput
-                  label="Limite de solutions"
-                  value={solutionLimit}
-                  onChange={(val) => setSolutionLimit(val ?? 0)}
-                  min={0}
-                  max={1000}
-                  helpText="0 = toutes les solutions"
-                />
+                <div>
+                  <NumberInput
+                    label="Limite de solutions"
+                    value={solutionLimit}
+                    onChange={(val) => setSolutionLimit(val ?? 0)}
+                    min={0}
+                    max={API_LIMITS.maxSolutionsPerRequest}
+                    helpText={`0 = toutes (max ${API_LIMITS.maxSolutionsPerRequest})`}
+                  />
+                  {solutionLimit > API_LIMITS.maxSolutionsPerRequest && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Maximum {API_LIMITS.maxSolutionsPerRequest} solutions par requête
+                    </p>
+                  )}
+                </div>
 
                 {/* Time Limit */}
-                <NumberInput
-                  label="Temps limite (secondes)"
-                  value={timeLimit}
-                  onChange={(val) => setTimeLimit(val ?? 0)}
-                  min={0}
-                  max={300}
-                  helpText="0 = pas de limite"
-                />
+                <div>
+                  <NumberInput
+                    label="Temps limite (secondes)"
+                    value={timeLimit}
+                    onChange={(val) => setTimeLimit(val ?? 0)}
+                    min={0}
+                    max={API_LIMITS.maxTimeLimit}
+                    helpText={`0 = pas de limite (max ${API_LIMITS.maxTimeLimit}s)`}
+                  />
+                  {timeLimit > API_LIMITS.maxTimeLimit && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Maximum {API_LIMITS.maxTimeLimit} secondes par requête
+                    </p>
+                  )}
+                </div>
 
                 {/* Arithmetic Base */}
                 <NumberInput
