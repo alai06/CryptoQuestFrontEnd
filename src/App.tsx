@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Home, BookOpen, Lightbulb, Wand2, Gamepad2, Trophy } from 'lucide-react';
 import NavigationMenu from './components/NavigationMenu';
 import MobileHomeScreen from './components/MobileHomeScreen';
 import Mobile2048Sidebar from './components/Mobile2048Sidebar';
@@ -105,7 +104,7 @@ export default function App() {
         case 'generator':
           return <GeneratorMode onBack={() => setCurrentScreen('home')} onCryptarithmGenerated={handleCryptarithmGenerated} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         case 'game':
-          return <GameMode onBack={() => setCurrentScreen('home')} tutorialCompleted={tutorialCompleted} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
+          return <GameMode onBack={() => setCurrentScreen('home')} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         case 'progress':
           return <ProgressDashboard onBack={() => setCurrentScreen('home')} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         default:
@@ -133,7 +132,7 @@ export default function App() {
       case 'generator':
         return <GeneratorMode onBack={() => setCurrentScreen('home')} onCryptarithmGenerated={handleCryptarithmGenerated} />;
       case 'game':
-        return <GameMode onBack={() => setCurrentScreen('home')} tutorialCompleted={tutorialCompleted} />;
+        return <GameMode onBack={() => setCurrentScreen('home')} />;
       case 'progress':
         return <ProgressDashboard onBack={() => setCurrentScreen('home')} />;
       default:

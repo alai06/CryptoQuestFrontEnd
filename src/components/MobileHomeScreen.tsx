@@ -67,10 +67,10 @@ export default function MobileHomeScreen({
           {/* Menu Button */}
           <button
             onClick={onOpenSidebar}
-            className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+            className="w-12 h-12 rounded-[12px] bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center shadow-md"
             aria-label="Menu"
           >
-            <Menu className="w-6 h-6 text-white" strokeWidth={2.5} />
+            <Menu className="w-6 h-6 text-white" strokeWidth={1.5} />
           </button>
 
           {/* Logo Text - Centered */}

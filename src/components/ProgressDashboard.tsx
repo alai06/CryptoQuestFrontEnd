@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, Clock, CheckCircle, Menu } from 'lucide-react';
+import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, CheckCircle, Menu } from 'lucide-react';
 import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface ProgressDashboardProps {
@@ -16,12 +16,6 @@ interface Achievement {
   unlocked: boolean;
   requirement: string;
   category: 'completion' | 'performance' | 'speed' | 'collection';
-}
-
-interface Level {
-  id: number;
-  name: string;
-  xpRequired: number;
 }
 
 // Calcul de l'XP requis pour chaque niveau (progression exponentielle)

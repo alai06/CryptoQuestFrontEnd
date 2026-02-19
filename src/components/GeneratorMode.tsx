@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
+import { Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
 import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
@@ -175,50 +175,11 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = JSON.parse(e.target?.result as string);
-        if (data.cryptarithms) {
-          const importedCryptarithms: GeneratedCryptarithm[] = data.cryptarithms.map((c: any) => ({
-            id: Date.now().toString(),
-            equation: c.equation,
-            solution: c.solution || '',
-            timestamp: new Date(c.timestamp),
-          }));
-          setGenerated([...importedCryptarithms, ...generated]);
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
   const handleDelete = (id: string) => {
     setGenerated(generated.filter(c => c.id !== id));
     if (selectedCryptarithm && selectedCryptarithm.id === id) {
       setSelectedCryptarithm(null);
     }
-  };
-
-  const handleImportWords = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        const words = text
-          .split(/[\r\n]+/)
-          .map(word => word.trim().toUpperCase())
-          .filter(word => /^[A-Z]+$/.test(word) && word.length >= 1 && word.length <= 10);
-
-        const uniqueWords = Array.from(new Set(words));
-        setCustomWords(uniqueWords);
-      };
-      reader.readAsText(file);
-    }
-    event.target.value = '';
   };
 
   const handleClearCustomWords = () => {
@@ -240,22 +201,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
       .filter(word => /^[A-Z]+$/.test(word) && word.length >= 1 && word.length <= 10);
 
     const uniqueWords = Array.from(new Set(words));
-    setCustomWords(uniqueWords.slice(0, MAX_CUSTOM_WORDS));
-  };
-
-  const handleAddCustomWords = () => {
-    const lines = customWordsText.split(/[\r\n]+/).filter(line => line.trim());
-    if (lines.length > MAX_CUSTOM_WORDS) {
-      return; // Don't allow more than MAX_CUSTOM_WORDS lines
-    }
-    setCustomWordsText('');
-
-    // Update custom words in real-time
-    const words = lines
-      .map(word => word.trim().toUpperCase())
-      .filter(word => /^[A-Z]+$/.test(word) && word.length >= 1 && word.length <= 10);
-
-    const uniqueWords = Array.from(new Set([...customWords, ...words]));
     setCustomWords(uniqueWords.slice(0, MAX_CUSTOM_WORDS));
   };
 
@@ -456,7 +401,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                   <p className="text-[13px] text-[#1D1D1F]">
                     <strong>Opération sélectionnée :</strong>{' '}
                     {operation === 'addition' ? 'Addition (+)' :
-                     operation === 'subtraction' ? 'Soustraction (-)' :
                      operation === 'multiplication' ? 'Multiplication (*)' :
                      operation === 'crossed' ? 'Opération croisée (CROSS)' :
                      operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}

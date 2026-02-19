@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, RotateCcw, Lightbulb, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
+import { Check, X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { getLetterConstraints, getDigitConstraints, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
+import { PrimaryButton, AlertBanner } from './ui';
 
 interface DragDropBoardProps {
   equation: string;
@@ -19,7 +20,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const [draggedDigit, setDraggedDigit] = useState<string | null>(null);
   const [draggedFromLetter, setDraggedFromLetter] = useState<string | null>(null);
   const [usedDigits, setUsedDigits] = useState<Set<string>>(new Set());
-  const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [selectedDigit, setSelectedDigit] = useState<string | null>(null);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
@@ -110,7 +110,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   useEffect(() => {
     const used = new Set(Object.values(assignments));
     setUsedDigits(used);
-    checkSolution();
   }, [assignments]);
 
   // Note: On ne bloque plus le scroll pour permettre une navigation normale
@@ -121,7 +120,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     if (!touchDraggedDigit) return;
 
     const handleGlobalTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
       const touch = e.touches[0];
       setTouchPosition({ x: touch.clientX, y: touch.clientY });
       
@@ -139,13 +137,14 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       
       if (letter && verifiedLetters[letter] !== 'correct') {
         setTouchTargetLetter(letter);
+        // Empêcher le scroll seulement quand on est au-dessus d'une zone de drop valide
+        e.preventDefault();
       } else {
         setTouchTargetLetter(null);
       }
     };
 
     const handleGlobalTouchEnd = (e: TouchEvent) => {
-      e.preventDefault();
       const touch = e.changedTouches[0];
       
       // Détecter la lettre sous le doigt en cherchant dans tous les éléments
@@ -238,7 +237,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
 
   const checkSolution = () => {
     if (Object.keys(assignments).length !== letters.length) {
-      setFeedback(null);
       return;
     }
 
@@ -246,8 +244,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     const isCorrect = validateSolution(equation, assignments);
     
     if (isCorrect) {
-      setFeedback('correct');
-      
       // Marquer toutes les lettres comme correctes (en vert)
       const allCorrect: Record<string, 'correct' | 'incorrect' | null> = {};
       letters.forEach(letter => {
@@ -261,17 +257,14 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       setHintMessage('🎉 Félicitations ! Vous avez résolu le cryptarithme !');
       
       if (onSolved) {
-        setTimeout(() => onSolved(), 2000);
+        setTimeout(() => onSolved(), 1000);
       }
-    } else {
-      setFeedback('incorrect');
     }
   };
 
   const handleDragStart = (digit: string) => {
     setDraggedDigit(digit);
     setSelectedDigit(digit);
-    setErrorMessage(null);
     
     // Highlight which letters this digit can be assigned to
     const numAssignments = Object.fromEntries(
@@ -357,7 +350,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     
     setAssignments(correctAssignments);
     setVerifiedLetters(correctVerified);
-    setFeedback(null);
     setSelectedLetter(null);
     setSelectedDigit(null);
     setHintMessage(null);
@@ -471,14 +463,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     setHighlightedLetters(new Set(constraints.possibleLetters));
   };
 
-  const getLetterConstraintsInfo = (letter: string) => {
-    const numAssignments = Object.fromEntries(
-      Object.entries(assignments).map(([k, v]) => [k, Number(v)])
-    );
-    const constraints = getLetterConstraints(equation, letter, numAssignments);
-    
-    return constraints;
-  };
+
 
   const renderEquation = () => {
     const parts: React.ReactNode[] = [];
@@ -503,7 +488,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
               {char}
             </span>
             {hasAssignment && (
-              <span className="absolute -bottom-8 md:-bottom-16 lg:-bottom-24 left-1/2 -translate-x-1/2 text-xl md:text-4xl lg:text-6xl text-purple-600 font-mono font-bold animate-fade-in">
+              <span className="absolute -bottom-6 md:-bottom-16 lg:-bottom-24 left-1/2 -translate-x-1/2 text-xl md:text-4xl lg:text-6xl text-purple-600 font-mono font-bold animate-fade-in">
                 {hasAssignment}
               </span>
             )}
@@ -560,10 +545,9 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     let correctCount = 0;
     let incorrectCount = 0;
 
-    // Only verify individual letters if solution is provided
+    // If no solution provided, use mathematical validation
     if (!solution) {
-      setHintMessage('Mode vérification désactivé : aucune solution de référence fournie');
-      setTimeout(() => setHintMessage(null), 3000);
+      checkSolution();
       return;
     }
 
@@ -617,7 +601,26 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
 
     // Show feedback message
     if (incorrectCount === 0 && correctCount > 0) {
-      setHintMessage(`✓ Toutes les attributions sont correctes ! (${correctCount})`);
+      // Vérifier si TOUTES les lettres sont assignées correctement
+      if (correctCount === letters.length) {
+        setHintMessage('🎉 Félicitations ! Vous avez résolu le cryptarithme !');
+        
+        // Marquer toutes les lettres comme correctes
+        const allCorrect: Record<string, 'correct' | 'incorrect' | null> = {};
+        letters.forEach(letter => {
+          if (newAssignments[letter]) {
+            allCorrect[letter] = 'correct';
+          }
+        });
+        setVerifiedLetters(allCorrect);
+        
+        // Déclencher la résolution
+        if (onSolved) {
+          setTimeout(() => onSolved(), 1000);
+        }
+      } else {
+        setHintMessage(`✓ Toutes les attributions sont correctes ! (${correctCount}/${letters.length})`);
+      }
     } else if (incorrectCount > 0 && correctCount > 0) {
       setHintMessage(`${correctCount} correct(s), ${incorrectCount} incorrect(s). Les chiffres incorrects ont été retirés.`);
     } else if (incorrectCount > 0) {
@@ -645,8 +648,107 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     setTimeout(() => setHintMessage(null), 4000);
   };
 
+  // Spacer fantôme pour mobile - prend la même hauteur que le panneau fixe
+  const mobileControlsSpacer = isMobile && (
+    <div className="bg-transparent border-t-2 border-transparent">
+      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 px-2">
+          <div className="h-12 sm:w-auto sm:min-w-[180px]"></div>
+          <div className="h-12 sm:w-auto sm:min-w-[200px]"></div>
+        </div>
+
+        {/* Available Digits */}
+        <div>
+          <p className="text-xs md:text-sm mb-2 text-center font-medium invisible">Spacer</p>
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            {availableDigits.map(digit => (
+              <div
+                key={digit}
+                className="w-12 h-12 md:w-14 md:h-14 flex-shrink-0"
+              >
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render mobile controls separately - fixed at bottom
+  const mobileControls = isMobile && (
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
+      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 px-2">
+          <PrimaryButton
+            onClick={handleVerify}
+            variant="primary"
+            leftIcon={<Check className="w-6 h-6" />}
+            className="sm:w-auto sm:min-w-[180px]"
+          >
+            Vérifier
+          </PrimaryButton>
+          
+          <PrimaryButton
+            onClick={handleReset}
+            variant="secondary"
+            leftIcon={<RotateCcw className="w-6 h-6" />}
+            className="sm:w-auto sm:min-w-[200px]"
+          >
+            Réinitialiser
+          </PrimaryButton>
+        </div>
+
+        {/* Available Digits */}
+        <div>
+          <p className="text-xs md:text-sm text-gray-700 mb-2 text-center font-medium">
+            {selectedDigit 
+              ? '👆 Appuyez sur une lettre pour assigner' 
+              : touchDraggedDigit
+              ? '👉 Maintenez et déposez sur une lettre'
+              : '✋ Glissez un chiffre sur une lettre'
+            }
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            {availableDigits.map(digit => {
+              const isSelected = selectedDigit === digit;
+              const isUsed = usedDigits.has(digit);
+              const isTouchDragged = touchDraggedDigit === digit;
+              
+              return (
+                <div
+                  key={digit}
+                  draggable={!isUsed}
+                  onDragStart={() => handleDragStart(digit)}
+                  onTouchStart={(e) => handleTouchStart(digit, e)}
+                  onClick={() => !isUsed && handleDigitClick(digit)}
+                  className={`
+                    w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-lg md:rounded-xl flex-shrink-0
+                    text-xl md:text-2xl font-mono transition-all duration-300
+                    ${isUsed
+                      ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed'
+                      : isTouchDragged
+                      ? 'bg-gradient-to-br from-purple-400 to-pink-400 text-white shadow-2xl scale-75 opacity-50'
+                      : isSelected
+                      ? 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-xl scale-110'
+                      : 'bg-gradient-to-br from-white to-gray-50 border-2 border-gray-300 text-gray-800 hover:border-purple-400 hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer cursor-move'
+                    }
+                  `}
+                  style={{ touchAction: 'none' }}
+                >
+                  {digit}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-8 sm:space-y-5 md:space-y-6 relative pb-[32rem] md:pb-56">
+    <div className={isMobile ? 'h-full overflow-y-auto space-y-8 sm:space-y-5 md:space-y-6 px-4' : 'space-y-8 sm:space-y-5 md:space-y-6 relative'}>
       {/* Élément visuel qui suit le doigt pendant le drag tactile */}
       {touchDraggedDigit && touchPosition && (
         <>
@@ -674,18 +776,20 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       )}
       {/* Error Message */}
       {errorMessage && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-lg">
-          <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-          <span className="text-red-900">{errorMessage}</span>
-        </div>
+        <AlertBanner
+          variant="error"
+          message={errorMessage}
+          className="animate-fade-in shadow-lg"
+        />
       )}
 
       {/* Hint Message */}
       {hintMessage && (
-        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-lg">
-          <Lightbulb className="w-6 h-6 text-blue-600 flex-shrink-0" />
-          <span className="text-blue-900">{hintMessage}</span>
-        </div>
+        <AlertBanner
+          variant="info"
+          message={hintMessage}
+          className="animate-fade-in shadow-lg"
+        />
       )}
 
       {/* Equation Display */}
@@ -700,7 +804,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       {/* Letter Assignment Zones */}
       <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} gap-3 sm:gap-2.5 md:gap-3`}>
         {letters.map(letter => {
-          const isHighlighted = highlightedLetters.has(letter);
           const isSelected = selectedLetter === letter;
           const hasAssignment = !!assignments[letter];
           const verificationStatus = verifiedLetters[letter];
@@ -916,96 +1019,27 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         })}
       </div>
 
-      {/* Sticky Bar en bas - Mobile uniquement */}
-      {isMobile && <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
-        <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-3 px-2">
-            <button
-              onClick={handleVerify}
-              className="flex items-center justify-center gap-4 px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 hover:shadow-lg text-lg font-semibold w-full sm:w-auto sm:min-w-[180px]"
-            >
-              <Check className="w-6 h-6 flex-shrink-0" />
-              <span>Vérifier</span>
-            </button>
-            
-            <button
-              onClick={handleReset}
-              className="flex items-center justify-center gap-4 px-8 py-4 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all duration-300 hover:shadow-lg text-lg font-semibold w-full sm:w-auto sm:min-w-[200px]"
-            >
-              <RotateCcw className="w-6 h-6 flex-shrink-0" />
-              <span>Réinitialiser</span>
-            </button>
-          </div>
-
-          {/* Available Digits */}
-          <div>
-            <p className="text-xs md:text-sm text-gray-700 mb-2 text-center font-medium">
-              {selectedDigit 
-                ? '👆 Appuyez sur une lettre pour assigner' 
-                : touchDraggedDigit
-                ? '👉 Maintenez et déposez sur une lettre'
-                : '✋ Glissez un chiffre sur une lettre'
-              }
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-              {availableDigits.map(digit => {
-                const isSelected = selectedDigit === digit;
-                const isUsed = usedDigits.has(digit);
-                const isTouchDragged = touchDraggedDigit === digit;
-                
-                return (
-                  <div
-                    key={digit}
-                    draggable={!isUsed}
-                    onDragStart={() => handleDragStart(digit)}
-                    onTouchStart={(e) => handleTouchStart(digit, e)}
-                    onClick={() => !isUsed && handleDigitClick(digit)}
-                    className={`
-                      w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-lg md:rounded-xl flex-shrink-0
-                      text-xl md:text-2xl font-mono transition-all duration-300
-                      ${isUsed
-                        ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed'
-                        : isTouchDragged
-                        ? 'bg-gradient-to-br from-purple-400 to-pink-400 text-white shadow-2xl scale-75 opacity-50'
-                        : isSelected
-                        ? 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-xl scale-110'
-                        : 'bg-gradient-to-br from-white to-gray-50 border-2 border-gray-300 text-gray-800 hover:border-purple-400 hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer cursor-move'
-                      }
-                    `}
-                    style={{ touchAction: 'none' }}
-                  >
-                    {digit}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>}
-
-      {/* Espace blanc en bas - uniquement mobile */}
-      {isMobile && <div className="bg-white h-32"></div>}
-
       {/* Boutons et chiffres pour PC - intégré au bloc */}
       {!isMobile && <div className="mt-6 space-y-4">
         {/* Action Buttons */}
         <div className="flex flex-row justify-center gap-3">
-          <button
+          <PrimaryButton
             onClick={handleVerify}
-            className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+            variant="primary"
+            leftIcon={<Check className="w-5 h-5" />}
+            className="hover:scale-105"
           >
-            <Check className="w-5 h-5" />
             Vérifier
-          </button>
+          </PrimaryButton>
           
-          <button
+          <PrimaryButton
             onClick={handleReset}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+            variant="secondary"
+            leftIcon={<RotateCcw className="w-5 h-5" />}
+            className="hover:scale-105"
           >
-            <RotateCcw className="w-5 h-5" />
             Réinitialiser
-          </button>
+          </PrimaryButton>
         </div>
 
         {/* Available Digits */}
@@ -1061,6 +1095,12 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           </ul>
         </div>
       )}
+      
+      {/* Spacer fantôme - caché par le panneau fixe mais permet le scroll */}
+      {mobileControlsSpacer}
+      
+      {/* Mobile controls - Fixed at bottom */}
+      {mobileControls}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { solveCryptarithm as solveCryptarithmAPI, getApiLimits } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
