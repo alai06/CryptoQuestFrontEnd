@@ -3,6 +3,10 @@ import { Check, X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { getLetterConstraints, getDigitConstraints, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
 import { PrimaryButton, AlertBanner } from './ui';
 
+// ===== TAILLE FIXE DES CARTES LETTRES (PC) =====
+const CARD_WIDTH = 135; // px — modifier ce nombre pour changer la largeur des cartes
+// ================================================
+
 interface DragDropBoardProps {
   equation: string;
   solution?: Record<string, string>; // Make solution optional
@@ -802,7 +806,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       </div>
 
       {/* Letter Assignment Zones */}
-      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} gap-3 sm:gap-2.5 md:gap-3`}>
+      <div className={`${isMobile ? 'grid grid-cols-2' : 'flex flex-wrap justify-center'} gap-3 sm:gap-2.5 md:gap-3`}>
         {letters.map(letter => {
           const isSelected = selectedLetter === letter;
           const hasAssignment = !!assignments[letter];
@@ -902,6 +906,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                   handleTouchStartFromLetter(letter, e);
                 }
               }}
+              style={!isMobile ? { width: CARD_WIDTH, flexShrink: 0 } : undefined}
               className={`
                 relative p-3 sm:p-1.5 md:p-2 rounded-xl sm:rounded-lg border-2 border-dashed transition-all duration-300 overflow-hidden
                 ${isLocked ? 'cursor-not-allowed' : hasAssignment ? 'cursor-move' : 'cursor-pointer'}

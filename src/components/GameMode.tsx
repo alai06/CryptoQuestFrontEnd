@@ -3,6 +3,10 @@ import { ArrowLeft, Trophy, Star, Timer, HelpCircle, ChevronRight, ChevronDown, 
 import DragDropBoard from './DragDropBoard';
 import { solveCryptarithm } from '../services/cryptatorApi';
 
+// ===== LARGEUR MAXIMALE DE LA ZONE DE JEU (PC) =====
+const GAME_MAX_WIDTH = 1250; // px — modifier ce nombre pour changer la largeur de la zone de jeu
+// ====================================================
+
 interface GameModeProps {
   onBack: () => void;
   isMobile?: boolean;
@@ -402,7 +406,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
     return (
       <>
       <div className={isMobile ? "h-screen flex flex-col" : "min-h-screen px-8 py-16"}>
-        <div className={isMobile ? "flex-shrink-0 px-4 py-4" : "max-w-4xl mx-auto"}>
+        <div className={isMobile ? "flex-shrink-0 px-4 py-4" : "mx-auto"} style={!isMobile ? { maxWidth: GAME_MAX_WIDTH } : undefined}>
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button
@@ -480,7 +484,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
         </div>
 
         {/* Game Board - Takes remaining space on mobile */}
-        <div className={isMobile ? "flex-1 min-h-0 overflow-hidden" : "max-w-4xl mx-auto bg-white rounded-[12px] border border-[#E5E5E5] p-8"}>
+        <div className={isMobile ? "flex-1 min-h-0 overflow-hidden" : "mx-auto bg-white rounded-[12px] border border-[#E5E5E5] p-8"} style={!isMobile ? { maxWidth: GAME_MAX_WIDTH } : undefined}>
           <DragDropBoard
             equation={selectedLevel.equation}
             solution={selectedLevel.solution}
