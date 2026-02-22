@@ -27,9 +27,12 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [selectedCryptarithm, setSelectedCryptarithm] = useState<GeneratedCryptarithm | null>(null);
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [customWordsText, setCustomWordsText] = useState<string>('');
-  const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  
+  // Generation mode
+  const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
+  const [language, setLanguage] = useState<string>('fr');
   
   // Advanced API options
   const [solutionLimit, setSolutionLimit] = useState<number>(5);
@@ -45,7 +48,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [crossGridSize, setCrossGridSize] = useState<number | undefined>(undefined);
 
-  const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
   const API_LIMITS = getApiLimits();
 
@@ -84,15 +86,21 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   };
 
   const handleGenerate = async () => {
-    if (generated.length >= MAX_CRYPTARITHMS) {
-      setShowLimitWarning(true);
-      setTimeout(() => setShowLimitWarning(false), 5000);
+    // Validation selon le mode
+    if (generationMode === 'manual' && customWords.length === 0) {
+      setError('Veuillez ajouter au moins un mot personnalisé');
       return;
     }
 
-    if (customWords.length === 0) {
-      setError('Veuillez ajouter au moins un mot personnalisé');
-      return;
+    if (generationMode === 'doubly-true') {
+      if (!lowerBound || !upperBound) {
+        setError('Veuillez définir les bornes inférieure et supérieure pour le mode Doubly True');
+        return;
+      }
+      if (lowerBound >= upperBound) {
+        setError('La borne inférieure doit être strictement inférieure à la borne supérieure');
+        return;
+      }
     }
 
     setGenerating(true);
@@ -100,7 +108,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
     try {
       const response = await generateCryptarithmsAPI({
-        words: customWords,
+        words: generationMode === 'manual' ? customWords : [],
         operatorSymbol: getOperatorSymbol(),
         solutionLimit: solutionLimit,
         timeLimit: timeLimit,
@@ -113,6 +121,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         threads: threads,
         allowLeadingZeros: allowLeadingZeros,
         crossGridSize: crossGridSize,
+        langCode: generationMode === 'doubly-true' ? language : undefined,
       });
 
       if (response.success && response.cryptarithms.length > 0) {
@@ -224,44 +233,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           </div>
         )}
 
-        {/* Limit Warning */}
-        {showLimitWarning && (
-          <div className="bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] p-4 mb-6 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-[#FF3B30] flex-shrink-0" strokeWidth={1.5} />
-            <div className="flex-1">
-              <p className="text-[#1D1D1F] text-[14px] font-medium">
-                Limite atteinte ! Vous avez généré le maximum de {MAX_CRYPTARITHMS} cryptarithmes.
-              </p>
-              <p className="text-[#86868B] text-[12px] mt-1">
-                Veuillez supprimer ou exporter certains cryptarithmes avant d'en générer de nouveaux.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Generation Progress */}
-        {generated.length > 0 && (
-          <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-4 mb-6"}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[14px] font-medium text-[#1D1D1F]">Cryptarithmes générés</span>
-              <span className={`text-[14px] font-medium ${generated.length >= MAX_CRYPTARITHMS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
-                {generated.length} / {MAX_CRYPTARITHMS}
-              </span>
-            </div>
-            <div className="w-full bg-[#E5E5E5] rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all ${generated.length >= MAX_CRYPTARITHMS
-                  ? 'bg-[#FF3B30]'
-                  : generated.length >= MAX_CRYPTARITHMS * 0.8
-                    ? 'bg-[#FF9500]'
-                    : 'bg-[#0096BC]'
-                  }`}
-                style={{ width: `${(generated.length / MAX_CRYPTARITHMS) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
         {/* Configuration Panel */}
         <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6"}>
           {/* Back Button - Mobile only */}
@@ -275,8 +246,49 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Operation Type */}
+            {/* Generation Mode Selection */}
             <div>
+              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                Mode de génération
+              </label>
+              <div className="space-y-2 mb-6">
+                <button
+                  onClick={() => setGenerationMode('manual')}
+                  className={`
+                    w-full flex items-start gap-3 px-4 py-3 rounded-[12px] transition-all text-left
+                    ${generationMode === 'manual'
+                      ? 'bg-[#0096BC] text-white'
+                      : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E5]'
+                    }
+                  `}
+                >
+                  <div className="flex-1">
+                    <div className="text-[14px] font-semibold mb-1">Normal</div>
+                    <div className={`text-[12px] ${generationMode === 'manual' ? 'text-white/80' : 'text-[#86868B]'}`}>
+                      Saisir les mots à la main
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setGenerationMode('doubly-true')}
+                  className={`
+                    w-full flex items-start gap-3 px-4 py-3 rounded-[12px] transition-all text-left
+                    ${generationMode === 'doubly-true'
+                      ? 'bg-[#0096BC] text-white'
+                      : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E5]'
+                    }
+                  `}
+                >
+                  <div className="flex-1">
+                    <div className="text-[14px] font-semibold mb-1">Doubly True</div>
+                    <div className={`text-[12px] ${generationMode === 'doubly-true' ? 'text-white/80' : 'text-[#86868B]'}`}>
+                      Génération par langue et bornes
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Operation Type */}
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
                 Type d'opération
               </label>
@@ -305,79 +317,141 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               </div>
             </div>
 
-            {/* Custom Words Text Area */}
+            {/* Custom Words Text Area (Mode Manuel) or Language Selection (Mode Doubly True) */}
             <div>
-              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
-                Mots personnalisés
-              </label>
-              <textarea
-                value={customWordsText}
-                onChange={(e) => handleCustomWordsTextChange(e.target.value)}
-                rows={6}
-                className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
-                placeholder={"SEND\nMORE\nMONEY"}
-              />
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-[#86868B] text-[12px]">
-                  Un mot par ligne (1-10 lettres, max {MAX_CUSTOM_WORDS})
-                </p>
-                <p className={`text-[12px] font-medium ${customWords.length >= MAX_CUSTOM_WORDS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
-                  {customWords.length} / {MAX_CUSTOM_WORDS}
-                </p>
+              {generationMode === 'manual' ? (
+                <>
+                  <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                    Mots personnalisés
+                  </label>
+                  <textarea
+                    value={customWordsText}
+                    onChange={(e) => handleCustomWordsTextChange(e.target.value)}
+                    rows={6}
+                    className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
+                    placeholder={"SEND\nMORE\nMONEY"}
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[#86868B] text-[12px]">
+                      Un mot par ligne (1-10 lettres, max {MAX_CUSTOM_WORDS})
+                    </p>
+                    <p className={`text-[12px] font-medium ${customWords.length >= MAX_CUSTOM_WORDS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
+                      {customWords.length} / {MAX_CUSTOM_WORDS}
+                    </p>
+                  </div>
+                  {customWords.length > 0 && (
+                    <button
+                      onClick={handleClearCustomWords}
+                      className="w-full py-2 bg-white hover:bg-[#FFF5F5] text-[#FF3B30] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium border border-[#FFE5E5] mt-3"
+                    >
+                      <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                      Effacer tout
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                    Langue et bornes
+                  </label>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Langue</label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      >
+                        <option value="fr">Français</option>
+                        <option value="en">Anglais</option>
+                        <option value="de">Allemand</option>
+                        <option value="es">Espagnol</option>
+                        <option value="it">Italien</option>
+                      </select>
+                    </div>
+                    
+                    {/* Lower Bound */}
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Borne inférieure *</label>
+                      <input
+                        type="number"
+                        value={lowerBound ?? ''}
+                        onChange={(e) => setLowerBound(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="Ex: 1"
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      />
+                    </div>
+
+                    {/* Upper Bound */}
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Borne supérieure *</label>
+                      <input
+                        type="number"
+                        value={upperBound ?? ''}
+                        onChange={(e) => setUpperBound(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="Ex: 10"
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-[#E8F7FB] border border-[#0096BC]/30 rounded-[12px]">
+                      <p className="text-[13px] text-[#1D1D1F] mb-2">
+                        <strong>Mode Doubly True</strong>
+                      </p>
+                      <p className="text-[12px] text-[#86868B] mb-2">
+                        Les mots seront générés automatiquement à partir des <strong>nombres écrits en lettres</strong> dans la langue sélectionnée.
+                      </p>
+                      <p className="text-[12px] text-[#86868B] italic">
+                        Exemple : avec les bornes 1 à 10 en français, les mots générés seront : <strong>UN</strong>, <strong>DEUX</strong>, <strong>TROIS</strong>, ..., <strong>DIX</strong>
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-6">
+            <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+              Actions
+            </label>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-3 p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-[#FF3B30] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-[#FF3B30] text-[13px]">{error}</p>
               </div>
-              {customWords.length > 0 && (
-                <button
-                  onClick={handleClearCustomWords}
-                  className="w-full py-2 bg-white hover:bg-[#FFF5F5] text-[#FF3B30] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium border border-[#FFE5E5] mt-3"
-                >
-                  <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-                  Effacer tout
-                </button>
+            )}
+
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                  Génération en cours...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-5 h-5" strokeWidth={1.5} />
+                  Générer
+                </>
               )}
-            </div>
+            </button>
 
-            {/* Actions */}
-            <div>
-              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
-                Actions
-              </label>
-
-              {/* Error Message */}
-              {error && (
-                <div className="mb-3 p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-[#FF3B30] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                  <p className="text-[#FF3B30] text-[13px]">{error}</p>
-                </div>
-              )}
-
+            {generated.length > 0 && (
               <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleExportAll}
+                className="w-full py-2 bg-[#F5F5F7] hover:bg-[#E5E5E5] text-[#1D1D1F] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium"
               >
-                {generating ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
-                    Génération en cours...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-5 h-5" strokeWidth={1.5} />
-                    Générer
-                  </>
-                )}
+                <Download className="w-4 h-4" strokeWidth={1.5} />
+                Exporter ({generated.length})
               </button>
-
-              {generated.length > 0 && (
-                <button
-                  onClick={handleExportAll}
-                  className="w-full py-2 bg-[#F5F5F7] hover:bg-[#E5E5E5] text-[#1D1D1F] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium"
-                >
-                  <Download className="w-4 h-4" strokeWidth={1.5} />
-                  Exporter ({generated.length})
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Advanced Options Section */}
@@ -396,20 +470,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
             {showAdvancedOptions && (
               <div className="p-4 bg-[#FAFAFA] rounded-[12px]">
-                {/* Info sur le symbole d'opération */}
-                <div className="mb-6 p-3 bg-[#E8F7FB] border border-[#0096BC]/30 rounded-[12px]">
-                  <p className="text-[13px] text-[#1D1D1F]">
-                    <strong>Opération sélectionnée :</strong>{' '}
-                    {operation === 'addition' ? 'Addition (+)' :
-                     operation === 'multiplication' ? 'Multiplication (*)' :
-                     operation === 'crossed' ? 'Opération croisée (CROSS)' :
-                     operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}
-                  </p>
-                  <p className="text-[12px] text-[#86868B] mt-1">
-                    Le type d'opération est défini par votre sélection dans les paramètres de base ci-dessus
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Solution Limit */}
                   <div>
@@ -477,26 +537,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                     helpText="Optionnel"
                   />
 
-                  {/* Lower Bound */}
-                  <NumberInput
-                    label="Borne inférieure"
-                    value={lowerBound}
-                    onChange={setLowerBound}
-                    placeholder="Non défini"
-                    allowUndefined={true}
-                    helpText="Optionnel"
-                  />
-
-                  {/* Upper Bound */}
-                  <NumberInput
-                    label="Borne supérieure"
-                    value={upperBound}
-                    onChange={setUpperBound}
-                    placeholder="Non défini"
-                    allowUndefined={true}
-                    helpText="Optionnel"
-                  />
-
                   {/* Threads */}
                   <NumberInput
                     label="Threads"
@@ -540,7 +580,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
             )}
           </div>
         </div>
-
+        
         {/* Custom Words Display */}
         {customWords.length > 0 && (
           <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6"}>
