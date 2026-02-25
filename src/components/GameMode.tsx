@@ -430,19 +430,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
 
           {/* Game Info */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`
-                px-3 py-1 rounded-full text-[14px] font-medium
-                ${selectedLevel.difficulty === 'easy' ? 'bg-[#D4F4DD] text-[#1D1D1F]' : ''}
-                ${selectedLevel.difficulty === 'medium' ? 'bg-[#FFF5E5] text-[#1D1D1F]' : ''}
-                ${selectedLevel.difficulty === 'hard' ? 'bg-[#FFE5E5] text-[#1D1D1F]' : ''}
-              `}>
-                {selectedLevel.difficulty === 'easy' && 'Facile'}
-                {selectedLevel.difficulty === 'medium' && 'Moyen'}
-                {selectedLevel.difficulty === 'hard' && 'Difficile'}
-              </span>
-            </div>
-            
             {/* Score actuel avec étoiles */}
             <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-3 md:p-4">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">

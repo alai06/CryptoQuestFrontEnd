@@ -31,6 +31,8 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [error, setError] = useState('');
   const [isCancelHovered, setIsCancelHovered] = useState(false);
   const currentTaskIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const generateGenerationRef = useRef<number>(0);
   
   // Generation mode
   const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
@@ -76,6 +78,22 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     }
   }, [generated]);
 
+  // Cleanup: cancel any in-flight request when the component unmounts
+  useEffect(() => {
+    return () => {
+      generateGenerationRef.current++;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      const taskId = currentTaskIdRef.current;
+      if (taskId) {
+        cancelTask(taskId).catch(() => {});
+        currentTaskIdRef.current = null;
+      }
+    };
+  }, []);
+
   // Synchroniser le symbole d'opération avec le type d'opération sélectionné
   const getOperatorSymbol = (): string => {
     switch (operation) {
@@ -105,6 +123,21 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
       }
     }
 
+    // Abort any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    const previousTaskId = currentTaskIdRef.current;
+    if (previousTaskId) {
+      cancelTask(previousTaskId).catch(() => {});
+      currentTaskIdRef.current = null;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentGeneration = ++generateGenerationRef.current;
+
     setGenerating(true);
     setError('');
     setIsCancelHovered(false);
@@ -129,7 +162,10 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         allowLeadingZeros: allowLeadingZeros,
         crossGridSize: crossGridSize,
         langCode: generationMode === 'doubly-true' ? language : undefined,
-      });
+      }, controller.signal);
+
+      // Ignore stale response
+      if (currentGeneration !== generateGenerationRef.current) return;
 
       if (response.success && response.cryptarithms.length > 0) {
         // Add all generated cryptarithms to the list
@@ -150,30 +186,49 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         setError(response.error || 'Aucun cryptarithme généré');
       }
     } catch (err) {
+      // Ignore stale errors
+      if (currentGeneration !== generateGenerationRef.current) return;
+
+      // AbortError means user cancelled — don't show any error
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+
       const errMsg = err instanceof Error ? err.message : 'Erreur lors de la génération';
-      // Don't show error if cancelled by user
       if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
         setError(errMsg);
       }
     } finally {
-      setGenerating(false);
-      setIsCancelHovered(false);
-      currentTaskIdRef.current = null;
+      if (currentGeneration === generateGenerationRef.current) {
+        setGenerating(false);
+        setIsCancelHovered(false);
+        currentTaskIdRef.current = null;
+        abortControllerRef.current = null;
+      }
     }
   };
 
   const handleCancelGenerate = async () => {
+    // Bump generation so the in-flight response is ignored
+    generateGenerationRef.current++;
+
+    // Abort the fetch request immediately
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Also tell the backend to cancel the task (fire-and-forget)
     const taskId = currentTaskIdRef.current;
     if (taskId) {
       currentTaskIdRef.current = null;
-      try {
-        await cancelTask(taskId);
-      } catch {
-        // ignore
-      }
+      cancelTask(taskId).catch(() => {});
     }
+
+    // Reset UI immediately
     setGenerating(false);
     setIsCancelHovered(false);
+    setError('');
   };
 
   const handleExportAll = () => {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { solveCryptarithm as solveCryptarithmAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
@@ -41,12 +41,15 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
 
 export default function SolverMode({ onBack, generatedCryptarithms, isMobile = false, onOpenSidebar }: SolverModeProps) {
   const [equation, setEquation] = useState('');
+  const [solvedEquation, setSolvedEquation] = useState(''); // équation confirmée par le serveur
   const [solving, setSolving] = useState(false);
   const [solutions, setSolutions] = useState<Array<Record<string, number>>>([]);
   const [currentSolutionIndex, setCurrentSolutionIndex] = useState(0);
   const [error, setError] = useState('');
   const [isCancelHovered, setIsCancelHovered] = useState(false);
   const currentTaskIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const solveGenerationRef = useRef<number>(0);
   const [selectedCategory, setSelectedCategory] = useState<OperationType>('addition');
   
   // Advanced API options
@@ -60,15 +63,47 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
 
   const API_LIMITS = getApiLimits();
 
+  // Cleanup: cancel any in-flight request when the component unmounts (e.g. user navigates away)
+  useEffect(() => {
+    return () => {
+      solveGenerationRef.current++;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      const taskId = currentTaskIdRef.current;
+      if (taskId) {
+        cancelTask(taskId).catch(() => {});
+        currentTaskIdRef.current = null;
+      }
+    };
+  }, []);
+
   const handleSolve = async () => {
     if (!equation.trim()) {
       setError('Veuillez entrer une équation');
       return;
     }
 
+    // Abort any previous in-flight request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    const previousTaskId = currentTaskIdRef.current;
+    if (previousTaskId) {
+      cancelTask(previousTaskId).catch(() => {});
+      currentTaskIdRef.current = null;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentGeneration = ++solveGenerationRef.current;
+
     setSolving(true);
     setError('');
     setSolutions([]);
+    setSolvedEquation('');
     setCurrentSolutionIndex(0);
     setIsCancelHovered(false);
 
@@ -85,17 +120,19 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         arithmeticBase: arithmeticBase,
         allowLeadingZeros: allowLeadingZeros,
         hornerScheme: hornerScheme,
-      });
+      }, controller.signal);
+
+      // Ignore stale response if a newer request was started or cancel was pressed
+      if (currentGeneration !== solveGenerationRef.current) return;
 
       if (response.success && response.solutions.length > 0) {
+        // Snapshot the equation at the moment the server responds
+        setSolvedEquation(equation);
         // Convert API solutions to the format expected by the UI
         const convertedSolutions = response.solutions.map(sol => {
           const assignment: Record<string, number> = {};
 
           if (sol.assignment.includes('\n')) {
-            // New format: two lines with pipes
-            // Line 1:  S| E| N| D| ...
-            // Line 2:  9| 5| 6| 7| ...
             const lines = sol.assignment.split('\n');
             if (lines.length >= 2) {
               const keys = lines[0].split('|').map(s => s.trim()).filter(s => s);
@@ -107,7 +144,6 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
               });
             }
           } else if (sol.assignment.includes('=')) {
-            // Old format: "s=9, e=5, n=6, d=7, m=1, o=0, r=8, y=2"
             sol.assignment.split(',').forEach(pair => {
               const [letter, digit] = pair.trim().split('=');
               if (letter && digit) {
@@ -122,36 +158,57 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         setError(response.error || 'Aucune solution trouvée pour ce cryptarithme');
       }
     } catch (err) {
+      // Ignore stale errors
+      if (currentGeneration !== solveGenerationRef.current) return;
+
+      // AbortError means user cancelled — don't show any error
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+
       const errMsg = err instanceof Error ? err.message : 'Erreur lors de la résolution';
       if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
         setError(errMsg);
       }
     } finally {
-      setSolving(false);
-      setIsCancelHovered(false);
-      currentTaskIdRef.current = null;
+      // Only update UI state if this is still the current request
+      if (currentGeneration === solveGenerationRef.current) {
+        setSolving(false);
+        setIsCancelHovered(false);
+        currentTaskIdRef.current = null;
+        abortControllerRef.current = null;
+      }
     }
   };
 
   const handleCancelSolve = async () => {
+    // Bump generation so the in-flight request's response is ignored
+    solveGenerationRef.current++;
+
+    // Abort the fetch request immediately
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Also tell the backend to cancel the task (fire-and-forget)
     const taskId = currentTaskIdRef.current;
     if (taskId) {
       currentTaskIdRef.current = null;
-      try {
-        await cancelTask(taskId);
-      } catch {
-        // ignore
-      }
+      cancelTask(taskId).catch(() => {});
     }
+
+    // Reset UI immediately — no stale error will appear because generation was bumped
     setSolving(false);
     setIsCancelHovered(false);
+    setError('');
   };
 
   const handleExport = () => {
     if (!solutions) return;
 
     const exportData = {
-      equation,
+      equation: solvedEquation,
       solutions,
       timestamp: new Date().toISOString(),
     };
@@ -167,11 +224,12 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
 
   const renderEquationWithSolution = (solution: Record<string, number>) => {
     // Diviser l'équation en parties (mots + opérateurs)
+    // Utilise solvedEquation (snapshot au moment de la réponse serveur)
     const parts: string[] = [];
     let currentPart = '';
     
-    for (let i = 0; i < equation.length; i++) {
-      const char = equation[i];
+    for (let i = 0; i < solvedEquation.length; i++) {
+      const char = solvedEquation[i];
       
       if (/[+\-*=]/.test(char)) {
         // Ajouter le mot actuel s'il existe

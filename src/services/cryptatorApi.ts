@@ -92,7 +92,7 @@ const MAX_TIME_LIMIT = 120; // 2 minutes max
  * @returns Promise with solve response
  * @throws Error if API is unreachable or returns an error
  */
-export async function solveCryptarithm(request: SolveRequest): Promise<SolveResponse> {
+export async function solveCryptarithm(request: SolveRequest, signal?: AbortSignal): Promise<SolveResponse> {
     // Validation des limites
     if (request.solutionLimit && request.solutionLimit > MAX_SOLUTIONS_PER_REQUEST) {
         throw new Error(`Limite de solutions dépassée. Maximum: ${MAX_SOLUTIONS_PER_REQUEST} solutions par requête.`);
@@ -111,6 +111,7 @@ export async function solveCryptarithm(request: SolveRequest): Promise<SolveResp
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    signal,
                     body: JSON.stringify({
                         cryptarithm: request.cryptarithm,
                         taskId: request.taskId,
@@ -153,7 +154,7 @@ export async function solveCryptarithm(request: SolveRequest): Promise<SolveResp
  * @returns Promise with generate response
  * @throws Error if API is unreachable or returns an error
  */
-export async function generateCryptarithms(request: GenerateRequest): Promise<GenerateResponse> {
+export async function generateCryptarithms(request: GenerateRequest, signal?: AbortSignal): Promise<GenerateResponse> {
     // Validation des limites
     if (request.solutionLimit && request.solutionLimit > MAX_SOLUTIONS_PER_REQUEST) {
         throw new Error(`Limite de génération dépassée. Maximum: ${MAX_SOLUTIONS_PER_REQUEST} cryptarithmes par requête.`);
@@ -172,6 +173,7 @@ export async function generateCryptarithms(request: GenerateRequest): Promise<Ge
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    signal,
                     body: JSON.stringify({
                         words: request.words,
                         taskId: request.taskId,
