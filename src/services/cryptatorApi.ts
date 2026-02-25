@@ -1,13 +1,13 @@
 /**
  * Cryptator API Service
  * Handles communication with the external cryptator-api server
- * API runs on http://localhost:8090
- * Includes rate limiting and security features to prevent API bombardment
+ * API URL is configured via VITE_API_URL environment variable
+ * Falls back to http://localhost:8090 for local development
  */
 
 import { rateLimiter, createCacheKey } from './rateLimiter';
 
-const API_BASE_URL = 'http://localhost:8090/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8090/api/v1';
 
 // ==================== Type Definitions ====================
 
