@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Star, Timer, HelpCircle, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
+import { ArrowLeft, Trophy, Star, Timer, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
 import DragDropBoard from './DragDropBoard';
 import { solveCryptarithm } from '../services/cryptatorApi';
 
@@ -36,7 +36,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const [totalVerifications, setTotalVerifications] = useState<number>(0);
   const [score, setScore] = useState(0);
-  const [showHint, setShowHint] = useState(false);
   const [levelStars, setLevelStars] = useState<Record<number, number>>({});
   const [gameLevels, setGameLevels] = useState<Level[]>([]);
   const [completedCryptarithms, setCompletedCryptarithms] = useState<Level[]>([]);
@@ -217,7 +216,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
     setSelectedLevel(level);
     setTimeElapsed(0);
     setTotalVerifications(0);
-    setShowHint(false);
   };
 
   const handleVerification = () => {
@@ -287,7 +285,7 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
         cryptarithm: customCryptarithm.trim(),
         solverType: 'SCALAR',
         solutionLimit: 2, // On cherche maximum 2 solutions pour vérifier qu'il y en a exactement 1
-        timeLimit: 10000,
+        timeLimit: 30,
       });
 
       if (!response.success) {
@@ -427,15 +425,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
                   {formatTime(timeElapsed)}
                 </span>
               </div>
-
-              {/* Help Button */}
-              <button
-                onClick={() => setShowHint(!showHint)}
-                className="flex items-center gap-2 bg-white border border-[#E5E5E5] px-4 py-2 rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] font-medium"
-              >
-                <HelpCircle className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
-                <span>Aide</span>
-              </button>
             </div>
           </div>
 
@@ -491,7 +480,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
             solution={selectedLevel.solution}
             onSolved={handleLevelComplete}
             onVerification={handleVerification}
-            showHints={showHint}
             easyMode={isEasyMode}
             isMobile={isMobile}
           />

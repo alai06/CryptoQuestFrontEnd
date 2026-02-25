@@ -29,7 +29,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const [hintMessage, setHintMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highlightedLetters, setHighlightedLetters] = useState<Set<string>>(new Set());
-  const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({});
+  const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({}); // État pour afficher/masquer les domaines par lettre
+  const [verificationEliminated, setVerificationEliminated] = useState<Record<string, Set<number>>>({}); // Chiffres définitivement éliminés après vérification incorrecte
   const [expandedLetters, setExpandedLetters] = useState<Record<string, boolean>>({}); // État pour afficher/masquer les domaines par lettre
   
   // États pour le support tactile mobile
@@ -41,12 +42,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const availableDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   // Get leading letters (first letter of each word)
+  // Only multi-character words cannot start with 0; single-letter variables can be 0
   const getLeadingLetters = (eq: string): Set<string> => {
     const leadingLetters = new Set<string>();
     // Match all words (sequences of letters)
     const words = eq.match(/[A-Z]+/g) || [];
     words.forEach(word => {
-      if (word.length > 0) {
+      if (word.length > 1) {
         leadingLetters.add(word[0]);
       }
     });
@@ -97,11 +99,20 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       });
     });
 
+    // Apply verification-eliminated values (permanently remove from domain display)
+    Object.entries(verificationEliminated).forEach(([letter, eliminated]) => {
+      if (newDomains[letter] && !assignments[letter]) {
+        eliminated.forEach(val => {
+          newDomains[letter].delete(val);
+        });
+      }
+    });
+
     // Note: Eliminated values (manually marked by player) are NOT removed from domains
     // They are only visually marked as eliminated but remain in the domain
 
     setLetterDomains(newDomains);
-  }, [assignments, equation]);
+  }, [assignments, equation, verificationEliminated]);
 
   // Use cached game state
   useEffect(() => {
@@ -546,6 +557,10 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     
     const newVerified = { ...verifiedLetters };
     const newAssignments = { ...assignments };
+    const newVerificationEliminated: Record<string, Set<number>> = {};
+    Object.entries(verificationEliminated).forEach(([k, v]) => {
+      newVerificationEliminated[k] = new Set(v);
+    });
     let correctCount = 0;
     let incorrectCount = 0;
 
@@ -596,12 +611,19 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         
         // Remove the incorrect assignment
         delete newAssignments[letter];
+
+        // Permanently mark this digit as eliminated for this letter
+        if (!newVerificationEliminated[letter]) {
+          newVerificationEliminated[letter] = new Set();
+        }
+        newVerificationEliminated[letter].add(Number(digit));
       }
     });
 
     setLetterDomains(newDomains);
     setVerifiedLetters(newVerified);
     setAssignments(newAssignments);
+    setVerificationEliminated(newVerificationEliminated);
 
     // Show feedback message
     if (incorrectCount === 0 && correctCount > 0) {

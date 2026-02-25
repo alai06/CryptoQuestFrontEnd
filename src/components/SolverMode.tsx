@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
-import { solveCryptarithm as solveCryptarithmAPI, getApiLimits } from '../services/cryptatorApi';
+import { solveCryptarithm as solveCryptarithmAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
 
@@ -32,9 +32,9 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
     'ABC + DEF = GHI && JKL + MNO = PQR',
   ],
   'long-multiplication': [
-    'AB * CD && EFG + HIJ = KLMN',
-    'ABC * DE && FGHI + JKLM = NOPQR',
-    'AB * CD && EF + GHI = JKLM',
+    "CUT * T = BUST && CUT * I = TNNT && TNNT * '10' + BUST = TENET && TENET = CUT * IT",
+    "RED * S = ARCS && RED * A = RED && RED * '10' + ARCS = CDTS && CDTS = RED * AS",
+    "SEE * SO = MIMEO && MIMEO = EMOO + '10'*MESS && SEE * O = EMOO && SEE * S = MESS",
   ],
   generated: [],
 };
@@ -45,6 +45,8 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   const [solutions, setSolutions] = useState<Array<Record<string, number>>>([]);
   const [currentSolutionIndex, setCurrentSolutionIndex] = useState(0);
   const [error, setError] = useState('');
+  const [isCancelHovered, setIsCancelHovered] = useState(false);
+  const currentTaskIdRef = useRef<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<OperationType>('addition');
   
   // Advanced API options
@@ -68,10 +70,15 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     setError('');
     setSolutions([]);
     setCurrentSolutionIndex(0);
+    setIsCancelHovered(false);
+
+    const taskId = crypto.randomUUID();
+    currentTaskIdRef.current = taskId;
 
     try {
       const response = await solveCryptarithmAPI({
         cryptarithm: equation,
+        taskId: taskId,
         solverType: solverType,
         solutionLimit: solutionLimit,
         timeLimit: timeLimit,
@@ -115,10 +122,29 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         setError(response.error || 'Aucune solution trouvée pour ce cryptarithme');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la résolution');
+      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la résolution';
+      if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
+        setError(errMsg);
+      }
     } finally {
       setSolving(false);
+      setIsCancelHovered(false);
+      currentTaskIdRef.current = null;
     }
+  };
+
+  const handleCancelSolve = async () => {
+    const taskId = currentTaskIdRef.current;
+    if (taskId) {
+      currentTaskIdRef.current = null;
+      try {
+        await cancelTask(taskId);
+      } catch {
+        // ignore
+      }
+    }
+    setSolving(false);
+    setIsCancelHovered(false);
   };
 
   const handleExport = () => {
@@ -446,15 +472,30 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
 
           {/* Solve Button */}
           <button
-            onClick={handleSolve}
-            disabled={solving || !equation.trim()}
-            className="w-full py-4 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-6 text-[14px] font-medium"
+            onClick={solving ? handleCancelSolve : handleSolve}
+            disabled={!solving && !equation.trim()}
+            onMouseEnter={() => solving && setIsCancelHovered(true)}
+            onMouseLeave={() => setIsCancelHovered(false)}
+            className={`w-full py-4 text-white rounded-[12px] transition-colors flex items-center justify-center gap-3 mb-6 text-[14px] font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+              solving && isCancelHovered
+                ? 'bg-[#FF3B30] hover:bg-[#CC2A1F] cursor-pointer'
+                : solving
+                ? 'bg-[#0096BC] cursor-default'
+                : 'bg-[#0096BC] hover:bg-[#007EA1]'
+            }`}
           >
             {solving ? (
-              <>
-                <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
-                <span>Résolution en cours...</span>
-              </>
+              isCancelHovered ? (
+                <>
+                  <X className="w-5 h-5" strokeWidth={2} />
+                  <span>Annuler la résolution</span>
+                </>
+              ) : (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                  <span>Résolution en cours...</span>
+                </>
+              )
             ) : (
               <>
                 <Play className="w-5 h-5" strokeWidth={1.5} />

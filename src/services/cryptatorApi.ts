@@ -23,6 +23,7 @@ export interface Solution {
 
 export interface SolveRequest {
     cryptarithm: string;
+    taskId?: string;
     solverType?: SolverType;
     solutionLimit?: number;
     timeLimit?: number;
@@ -51,6 +52,7 @@ export interface GeneratedCryptarithm {
 
 export interface GenerateRequest {
     words: string[];
+    taskId?: string;
     operatorSymbol?: string;
     solutionLimit?: number;
     timeLimit?: number;
@@ -111,6 +113,7 @@ export async function solveCryptarithm(request: SolveRequest): Promise<SolveResp
                     },
                     body: JSON.stringify({
                         cryptarithm: request.cryptarithm,
+                        taskId: request.taskId,
                         solverType: request.solverType || 'SCALAR',
                         solutionLimit: request.solutionLimit ?? 0,
                         timeLimit: request.timeLimit ?? 0,
@@ -171,6 +174,7 @@ export async function generateCryptarithms(request: GenerateRequest): Promise<Ge
                     },
                     body: JSON.stringify({
                         words: request.words,
+                        taskId: request.taskId,
                         operatorSymbol: request.operatorSymbol || '+',
                         solutionLimit: request.solutionLimit ?? 5,
                         timeLimit: request.timeLimit ?? 60,
@@ -210,6 +214,24 @@ export async function generateCryptarithms(request: GenerateRequest): Promise<Ge
         cacheKey,
         1 // Priorité plus haute pour la génération
     );
+}
+
+/**
+ * Cancel a running task by its ID
+ * @param taskId - The task ID to cancel
+ */
+export async function cancelTask(taskId: string): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        return data.success === true;
+    } catch {
+        return false;
+    }
 }
 
 /**

@@ -206,12 +206,6 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
   ];
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).length;
-  const categoryColors = {
-    completion: { bg: 'bg-[#E8F7FB]', border: 'border-[#0096BC]', icon: 'bg-[#0096BC]' },
-    performance: { bg: 'bg-[#FFFBF0]', border: 'border-[#FFD60A]', icon: 'bg-[#FFD60A]' },
-    speed: { bg: 'bg-[#FFE5F0]', border: 'border-[#FF3B7C]', icon: 'bg-[#FF3B7C]' },
-    collection: { bg: 'bg-[#F0E8FF]', border: 'border-[#9B51E0]', icon: 'bg-[#9B51E0]' },
-  };
 
   return (
     <div className="min-h-screen px-8 py-16 pt-24">
@@ -342,14 +336,13 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {achievements.map((achievement) => {
               const Icon = achievement.icon;
-              const colors = categoryColors[achievement.category];
               return (
                 <div
                   key={achievement.id}
                   className={`
                     rounded-[12px] border p-6 transition-all
                     ${achievement.unlocked
-                      ? `${colors.bg} ${colors.border}`
+                      ? 'bg-[#E8F7FB] border-[#0096BC]'
                       : 'bg-[#F5F5F7] border-[#E5E5E5] opacity-60'
                     }
                   `}
@@ -358,7 +351,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
                     <div className={`
                       w-12 h-12 rounded-[12px] flex items-center justify-center flex-shrink-0
                       ${achievement.unlocked
-                        ? `${colors.icon} text-white`
+                        ? 'bg-[#0096BC] text-white'
                         : 'bg-[#E5E5E5] text-[#86868B]'
                       }
                     `}>
@@ -366,11 +359,11 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
                     </div>
 
                     <div className="flex-1">
-                      <h3 className="text-[#1D1D1F] mb-1 font-semibold text-[16px]">{achievement.name}</h3>
+                      <h3 className={`mb-1 font-semibold text-[16px] ${achievement.unlocked ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>{achievement.name}</h3>
                       <p className="text-[#86868B] text-[13px] mb-2">{achievement.description}</p>
                       <p className="text-[12px] text-[#86868B]/80">{achievement.requirement}</p>
                       {achievement.unlocked && (
-                        <div className="mt-3 inline-flex items-center gap-1 bg-[#34C759]/10 text-[#34C759] px-3 py-1 rounded-full text-[12px] font-semibold">
+                        <div className="mt-3 inline-flex items-center gap-1 bg-[#0096BC]/10 text-[#0096BC] px-3 py-1 rounded-full text-[12px] font-semibold">
                           ✓ Débloqué
                         </div>
                       )}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
-import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits } from '../services/cryptatorApi';
+import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
 import BackButtonWithProgress from './BackButtonWithProgress';
@@ -29,6 +29,8 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [customWordsText, setCustomWordsText] = useState<string>('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [isCancelHovered, setIsCancelHovered] = useState(false);
+  const currentTaskIdRef = useRef<string | null>(null);
   
   // Generation mode
   const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
@@ -105,10 +107,15 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
     setGenerating(true);
     setError('');
+    setIsCancelHovered(false);
+
+    const taskId = crypto.randomUUID();
+    currentTaskIdRef.current = taskId;
 
     try {
       const response = await generateCryptarithmsAPI({
         words: generationMode === 'manual' ? customWords : [],
+        taskId: taskId,
         operatorSymbol: getOperatorSymbol(),
         solutionLimit: solutionLimit,
         timeLimit: timeLimit,
@@ -143,10 +150,30 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         setError(response.error || 'Aucun cryptarithme généré');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
+      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la génération';
+      // Don't show error if cancelled by user
+      if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
+        setError(errMsg);
+      }
     } finally {
       setGenerating(false);
+      setIsCancelHovered(false);
+      currentTaskIdRef.current = null;
     }
+  };
+
+  const handleCancelGenerate = async () => {
+    const taskId = currentTaskIdRef.current;
+    if (taskId) {
+      currentTaskIdRef.current = null;
+      try {
+        await cancelTask(taskId);
+      } catch {
+        // ignore
+      }
+    }
+    setGenerating(false);
+    setIsCancelHovered(false);
   };
 
   const handleExportAll = () => {
@@ -426,15 +453,30 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
             )}
 
             <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={generating ? handleCancelGenerate : handleGenerate}
+              disabled={!generating && false}
+              onMouseEnter={() => generating && setIsCancelHovered(true)}
+              onMouseLeave={() => setIsCancelHovered(false)}
+              className={`w-full py-3 text-white rounded-[12px] transition-all flex items-center justify-center gap-2 mb-2 font-medium ${
+                generating && isCancelHovered
+                  ? 'bg-[#FF3B30] hover:bg-[#CC2A1F] cursor-pointer'
+                  : generating
+                  ? 'bg-[#0096BC] cursor-default'
+                  : 'bg-[#0096BC] hover:bg-[#007EA1]'
+              }`}
             >
               {generating ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
-                  Génération en cours...
-                </>
+                isCancelHovered ? (
+                  <>
+                    <X className="w-5 h-5" strokeWidth={2} />
+                    Annuler la génération
+                  </>
+                ) : (
+                  <>
+                    <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                    Génération en cours...
+                  </>
+                )
               ) : (
                 <>
                   <Wand2 className="w-5 h-5" strokeWidth={1.5} />
