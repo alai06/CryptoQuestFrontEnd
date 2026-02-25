@@ -183,23 +183,6 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
                 <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
               </div>
             </button>
-
-            {/* Tutorial Badge */}
-            {!tutorialCompleted && (
-              <div className="bg-[#E8F7FB] border border-[#00AFD7]/20 rounded-[12px] p-6">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-[#00AFD7] rounded-full mt-2 flex-shrink-0"></div>
-                  <div>
-                    <div className="text-[14px] font-semibold text-[#1D1D1F] mb-1">
-                      Tutoriel recommandé
-                    </div>
-                    <p className="text-[13px] text-[#86868B] leading-relaxed">
-                      Apprenez les bases en 5 minutes
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
