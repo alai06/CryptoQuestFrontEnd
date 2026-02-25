@@ -3,6 +3,8 @@ import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, Chevro
 import { solveCryptarithm as solveCryptarithmAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
+import VerticalCryptarithm from './VerticalCryptarithm';
+import CrossedCryptarithm from './CrossedCryptarithm';
 
 interface SolverModeProps {
   onBack: () => void;
@@ -222,112 +224,19 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     URL.revokeObjectURL(url);
   };
 
-  const renderEquationWithSolution = (solution: Record<string, number>) => {
-    // Diviser l'équation en parties (mots + opérateurs)
-    // Utilise solvedEquation (snapshot au moment de la réponse serveur)
-    const parts: string[] = [];
-    let currentPart = '';
+  // Fonction pour convertir l'équation avec les lettres en équation avec les chiffres
+  const getEquationWithNumbers = (solution: Record<string, number>): string => {
+    let equationWithNumbers = solvedEquation;
     
-    for (let i = 0; i < solvedEquation.length; i++) {
-      const char = solvedEquation[i];
-      
-      if (/[+\-*=]/.test(char)) {
-        // Ajouter le mot actuel s'il existe
-        if (currentPart.trim()) {
-          parts.push(currentPart.trim());
-        }
-        // Ajouter l'opérateur avec le mot précédent
-        if (parts.length > 0) {
-          parts[parts.length - 1] += ' ' + char;
-        }
-        currentPart = '';
-      } else if (char === ' ') {
-        // Ignorer les espaces multiples
-        if (currentPart && currentPart[currentPart.length - 1] !== ' ') {
-          currentPart += char;
-        }
-      } else {
-        currentPart += char;
-      }
-    }
+    // Remplacer chaque lettre par sa valeur numérique
+    Object.keys(solution)
+      .sort((a, b) => b.length - a.length) // Trier par longueur décroissante
+      .forEach(letter => {
+        const value = solution[letter];
+        equationWithNumbers = equationWithNumbers.replace(new RegExp(letter, 'g'), value.toString());
+      });
     
-    // Ajouter la dernière partie
-    if (currentPart.trim()) {
-      parts.push(currentPart.trim());
-    }
-    
-    // Déterminer la taille en fonction de la longueur maximale d'une partie
-    const maxLength = Math.max(...parts.map(part => part.length));
-    const getTextSizeClasses = () => {
-      if (maxLength > 15) {
-        return {
-          letter: 'text-sm md:text-[20px]',
-          digit: 'text-xs md:text-[16px]',
-          operator: 'text-sm md:text-[20px]',
-          height: 'h-[2rem] md:h-[3rem]',
-          minWidth: 'min-w-[1rem] md:min-w-[1.5rem]'
-        };
-      } else if (maxLength > 10) {
-        return {
-          letter: 'text-base md:text-[24px]',
-          digit: 'text-sm md:text-[18px]',
-          operator: 'text-base md:text-[24px]',
-          height: 'h-[2.25rem] md:h-[3.5rem]',
-          minWidth: 'min-w-[1.125rem] md:min-w-[1.75rem]'
-        };
-      } else {
-        return {
-          letter: 'text-lg md:text-[28px]',
-          digit: 'text-base md:text-[20px]',
-          operator: 'text-lg md:text-[28px]',
-          height: 'h-[2.5rem] md:h-[4rem]',
-          minWidth: 'min-w-[1.25rem] md:min-w-[2rem]'
-        };
-      }
-    };
-    
-    const sizeClasses = getTextSizeClasses();
-    
-    return (
-      <div className="flex flex-col items-center gap-3 md:gap-4 w-full overflow-x-auto">
-        {parts.map((part, partIndex) => (
-          <div key={partIndex} className="flex flex-wrap items-start justify-center gap-0.5 md:gap-1">
-            {part.split('').map((char, charIndex) => {
-              if (/[A-Z]/.test(char) && solution[char] !== undefined) {
-                return (
-                  <div key={charIndex} className={`flex flex-col items-center ${sizeClasses.minWidth}`}>
-                    <span className={`${sizeClasses.letter} text-[#1D1D1F] font-bold`}>
-                      {char}
-                    </span>
-                    <span className={`${sizeClasses.digit} text-[#0096BC] font-mono font-semibold mt-0.5 md:mt-1`}>
-                      {solution[char]}
-                    </span>
-                  </div>
-                );
-              } else if (char === ' ') {
-                return <div key={charIndex} className="w-2 md:w-3" />;
-              } else if (/[+\-*=]/.test(char)) {
-                return (
-                  <div key={charIndex} className={`flex items-center ${sizeClasses.minWidth} ${sizeClasses.height}`}>
-                    <span className={`${sizeClasses.operator} text-[#86868B] font-medium`}>
-                      {char}
-                    </span>
-                  </div>
-                );
-              } else {
-                return (
-                  <div key={charIndex} className={`flex items-center ${sizeClasses.height}`}>
-                    <span className={`${sizeClasses.letter} text-[#1D1D1F]`}>
-                      {char}
-                    </span>
-                  </div>
-                );
-              }
-            })}
-          </div>
-        ))}
-      </div>
-    );
+    return equationWithNumbers;
   };
 
   return (
@@ -600,10 +509,58 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                   </button>
                 </div>
 
-                {/* Equation with solution */}
-                <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl p-8 md:p-10 border border-purple-200 mb-8">
-                  <p className="text-center text-[14px] text-[#86868B] mb-6">Équation résolue</p>
-                  {renderEquationWithSolution(solutions[currentSolutionIndex])}
+                {/* Affichage côte à côte : équation avec lettres et équation avec chiffres */}
+                <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl p-6 md:p-10 border border-purple-200 mb-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                    {/* Cryptarithme avec lettres */}
+                    <div>
+                      <p className="text-center text-[14px] text-[#86868B] mb-4 font-medium">Cryptarithme</p>
+                      <div className="flex justify-center">
+                        <div className="bg-white rounded-[12px] p-6 md:p-8 border border-[#E5E5E5] shadow-sm">
+                          {(() => {
+                            const equation = solvedEquation;
+                            const sizeForDisplay = isMobile ? 'small' : 'medium';
+                            // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
+                            if (equation.includes('&&')) {
+                              // Format CROSS: "AN + ODE = TUT && TA + TEL = SUT && ..."
+                              // Prendre les 3 premières équations et les joindre avec |
+                              const equations = equation.split('&&').map((eq: string) => eq.trim());
+                              const crossEquation = equations.slice(0, 3).join(' | ');
+                              return <CrossedCryptarithm equation={crossEquation} size={sizeForDisplay} />;
+                            } else if (equation.includes('|')) {
+                              return <CrossedCryptarithm equation={equation} size={sizeForDisplay} />;
+                            } else {
+                              return <VerticalCryptarithm equation={equation} size={sizeForDisplay} />;
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Solution avec chiffres */}
+                    <div>
+                      <p className="text-center text-[14px] text-[#86868B] mb-4 font-medium">Solution</p>
+                      <div className="flex justify-center">
+                        <div className="bg-white rounded-[12px] p-6 md:p-8 border-2 border-[#0096BC] shadow-sm">
+                          {(() => {
+                            const equationWithNumbers = getEquationWithNumbers(solutions[currentSolutionIndex]);
+                            const sizeForDisplay = isMobile ? 'small' : 'medium';
+                            // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
+                            if (equationWithNumbers.includes('&&')) {
+                              // Format CROSS
+                              const equations = equationWithNumbers.split('&&').map((eq: string) => eq.trim());
+                              const crossEquation = equations.slice(0, 3).join(' | ');
+                              return <CrossedCryptarithm equation={crossEquation} size={sizeForDisplay} />;
+                            } else if (equationWithNumbers.includes('|')) {
+                              return <CrossedCryptarithm equation={equationWithNumbers} size={sizeForDisplay} />;
+                            } else {
+                              return <VerticalCryptarithm equation={equationWithNumbers} size={sizeForDisplay} />;
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Letter-Digit Mapping */}
