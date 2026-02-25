@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, RotateCcw, Lightbulb, AlertCircle } from 'lucide-react';
-import { getLetterConstraints, getDigitConstraints, getHintForLetter, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
+import { Check, X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { getLetterConstraints, getDigitConstraints, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
+import { PrimaryButton, AlertBanner } from './ui';
+
+// ===== TAILLE FIXE DES CARTES LETTRES (PC) =====
+const CARD_WIDTH = 135; // px — modifier ce nombre pour changer la largeur des cartes
+// ================================================
 
 interface DragDropBoardProps {
   equation: string;
@@ -17,14 +22,16 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const [letterDomains, setLetterDomains] = useState<Record<string, Set<number>>>({});
   const [verifiedLetters, setVerifiedLetters] = useState<Record<string, 'correct' | 'incorrect' | null>>({});
   const [draggedDigit, setDraggedDigit] = useState<string | null>(null);
+  const [draggedFromLetter, setDraggedFromLetter] = useState<string | null>(null);
   const [usedDigits, setUsedDigits] = useState<Set<string>>(new Set());
-  const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [selectedDigit, setSelectedDigit] = useState<string | null>(null);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highlightedLetters, setHighlightedLetters] = useState<Set<string>>(new Set());
-  const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({});
+  const [eliminatedValues, setEliminatedValues] = useState<Record<string, Set<number>>>({}); // État pour afficher/masquer les domaines par lettre
+  const [verificationEliminated, setVerificationEliminated] = useState<Record<string, Set<number>>>({}); // Chiffres définitivement éliminés après vérification incorrecte
+  const [expandedLetters, setExpandedLetters] = useState<Record<string, boolean>>({}); // État pour afficher/masquer les domaines par lettre
   
   // États pour le support tactile mobile
   const [touchDraggedDigit, setTouchDraggedDigit] = useState<string | null>(null);
@@ -35,12 +42,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const availableDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   // Get leading letters (first letter of each word)
+  // Only multi-character words cannot start with 0; single-letter variables can be 0
   const getLeadingLetters = (eq: string): Set<string> => {
     const leadingLetters = new Set<string>();
     // Match all words (sequences of letters)
     const words = eq.match(/[A-Z]+/g) || [];
     words.forEach(word => {
-      if (word.length > 0) {
+      if (word.length > 1) {
         leadingLetters.add(word[0]);
       }
     });
@@ -62,6 +70,50 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     setLetterDomains(initialDomains);
   }, [equation]);
 
+  // Update letter domains dynamically when assignments change
+  useEffect(() => {
+    const leadingLetters = getLeadingLetters(equation);
+    const newDomains: Record<string, Set<number>> = {};
+    
+    // Initialize domains for all letters
+    letters.forEach(letter => {
+      if (leadingLetters.has(letter)) {
+        newDomains[letter] = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      } else {
+        newDomains[letter] = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      }
+    });
+
+    // Remove assigned values from domains of unassigned letters
+    Object.entries(assignments).forEach(([assignedLetter, assignedValue]) => {
+      const numValue = Number(assignedValue);
+      
+      // For the assigned letter, reduce its domain to only the assigned value
+      newDomains[assignedLetter] = new Set([numValue]);
+      
+      // Remove this value from all other letters' domains
+      letters.forEach(letter => {
+        if (letter !== assignedLetter && !assignments[letter]) {
+          newDomains[letter].delete(numValue);
+        }
+      });
+    });
+
+    // Apply verification-eliminated values (permanently remove from domain display)
+    Object.entries(verificationEliminated).forEach(([letter, eliminated]) => {
+      if (newDomains[letter] && !assignments[letter]) {
+        eliminated.forEach(val => {
+          newDomains[letter].delete(val);
+        });
+      }
+    });
+
+    // Note: Eliminated values (manually marked by player) are NOT removed from domains
+    // They are only visually marked as eliminated but remain in the domain
+
+    setLetterDomains(newDomains);
+  }, [assignments, equation, verificationEliminated]);
+
   // Use cached game state
   useEffect(() => {
     const numAssignments = Object.fromEntries(
@@ -73,7 +125,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   useEffect(() => {
     const used = new Set(Object.values(assignments));
     setUsedDigits(used);
-    checkSolution();
   }, [assignments]);
 
   // Note: On ne bloque plus le scroll pour permettre une navigation normale
@@ -84,7 +135,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     if (!touchDraggedDigit) return;
 
     const handleGlobalTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
       const touch = e.touches[0];
       setTouchPosition({ x: touch.clientX, y: touch.clientY });
       
@@ -102,13 +152,14 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       
       if (letter && verifiedLetters[letter] !== 'correct') {
         setTouchTargetLetter(letter);
+        // Empêcher le scroll seulement quand on est au-dessus d'une zone de drop valide
+        e.preventDefault();
       } else {
         setTouchTargetLetter(null);
       }
     };
 
     const handleGlobalTouchEnd = (e: TouchEvent) => {
-      e.preventDefault();
       const touch = e.changedTouches[0];
       
       // Détecter la lettre sous le doigt en cherchant dans tous les éléments
@@ -136,6 +187,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
             setErrorMessage(validation.reason || 'Attribution invalide');
             setTimeout(() => setErrorMessage(null), 3000);
             setTouchDraggedDigit(null);
+            setDraggedFromLetter(null);
             setTouchPosition(null);
             setTouchTargetLetter(null);
             setHighlightedLetters(new Set());
@@ -149,7 +201,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           delete oldAssignment[letter];
         }
         
-        // Remove touchDraggedDigit from any other letter
+        // Remove touchDraggedDigit from any other letter (including source letter if re-dragging)
         Object.keys(oldAssignment).forEach(key => {
           if (oldAssignment[key] === touchDraggedDigit) {
             delete oldAssignment[key];
@@ -162,10 +214,26 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         // Reset verification status when changing assignment
         const newVerified = { ...verifiedLetters };
         newVerified[letter] = null;
+        // Also reset the source letter if we're moving from another letter
+        if (draggedFromLetter) {
+          newVerified[draggedFromLetter] = null;
+        }
+        setVerifiedLetters(newVerified);
+      } else if (draggedFromLetter) {
+        // Si on n'a pas droppé sur une lettre valide mais qu'on vient d'une lettre,
+        // désassigner le chiffre de la lettre source
+        const newAssignments = { ...assignments };
+        delete newAssignments[draggedFromLetter];
+        setAssignments(newAssignments);
+        
+        // Réinitialiser le statut de vérification
+        const newVerified = { ...verifiedLetters };
+        newVerified[draggedFromLetter] = null;
         setVerifiedLetters(newVerified);
       }
       
       setTouchDraggedDigit(null);
+      setDraggedFromLetter(null);
       setTouchPosition(null);
       setTouchTargetLetter(null);
       setHighlightedLetters(new Set());
@@ -184,7 +252,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
 
   const checkSolution = () => {
     if (Object.keys(assignments).length !== letters.length) {
-      setFeedback(null);
       return;
     }
 
@@ -192,8 +259,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     const isCorrect = validateSolution(equation, assignments);
     
     if (isCorrect) {
-      setFeedback('correct');
-      
       // Marquer toutes les lettres comme correctes (en vert)
       const allCorrect: Record<string, 'correct' | 'incorrect' | null> = {};
       letters.forEach(letter => {
@@ -207,17 +272,14 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       setHintMessage('🎉 Félicitations ! Vous avez résolu le cryptarithme !');
       
       if (onSolved) {
-        setTimeout(() => onSolved(), 2000);
+        setTimeout(() => onSolved(), 1000);
       }
-    } else {
-      setFeedback('incorrect');
     }
   };
 
   const handleDragStart = (digit: string) => {
     setDraggedDigit(digit);
     setSelectedDigit(digit);
-    setErrorMessage(null);
     
     // Highlight which letters this digit can be assigned to
     const numAssignments = Object.fromEntries(
@@ -228,12 +290,15 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   };
 
   const handleDrop = (letter: string) => {
-    if (draggedDigit) {
+    const digitToDrop = draggedDigit || (draggedFromLetter ? assignments[draggedFromLetter] : null);
+    
+    if (digitToDrop) {
       // Prevent modifying a letter that has been verified as correct
       if (verifiedLetters[letter] === 'correct') {
         setErrorMessage(`La lettre ${letter} est déjà correctement assignée et ne peut pas être modifiée`);
         setTimeout(() => setErrorMessage(null), 3000);
         setDraggedDigit(null);
+        setDraggedFromLetter(null);
         setHighlightedLetters(new Set());
         return;
       }
@@ -244,11 +309,12 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
 
       // Check if valid in easy mode
       if (easyMode) {
-        const validation = isValidEasyModeAssignment(equation, letter, Number(draggedDigit), numAssignments);
+        const validation = isValidEasyModeAssignment(equation, letter, Number(digitToDrop), numAssignments);
         if (!validation.valid) {
           setErrorMessage(validation.reason || 'Attribution invalide');
           setTimeout(() => setErrorMessage(null), 3000);
           setDraggedDigit(null);
+          setDraggedFromLetter(null);
           setHighlightedLetters(new Set());
           return;
         }
@@ -260,30 +326,45 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         delete oldAssignment[letter];
       }
       
-      // Remove draggedDigit from any other letter
+      // Remove digitToDrop from any other letter (including draggedFromLetter)
       Object.keys(oldAssignment).forEach(key => {
-        if (oldAssignment[key] === draggedDigit) {
+        if (oldAssignment[key] === digitToDrop) {
           delete oldAssignment[key];
         }
       });
 
-      const newAssignments = { ...oldAssignment, [letter]: draggedDigit };
+      const newAssignments = { ...oldAssignment, [letter]: digitToDrop };
       setAssignments(newAssignments);
 
       // Reset verification status when changing assignment
       const newVerified = { ...verifiedLetters };
       newVerified[letter] = null;
+      // Also reset the source letter if we're moving from another letter
+      if (draggedFromLetter) {
+        newVerified[draggedFromLetter] = null;
+      }
       setVerifiedLetters(newVerified);
       
       setDraggedDigit(null);
+      setDraggedFromLetter(null);
       setHighlightedLetters(new Set());
     }
   };
 
   const handleReset = () => {
-    setAssignments({});
-    setVerifiedLetters({});
-    setFeedback(null);
+    // Préserver les lettres vérifiées comme correctes
+    const correctAssignments: Record<string, string> = {};
+    const correctVerified: Record<string, 'correct' | 'incorrect' | null> = {};
+    
+    Object.entries(verifiedLetters).forEach(([letter, status]) => {
+      if (status === 'correct' && assignments[letter]) {
+        correctAssignments[letter] = assignments[letter];
+        correctVerified[letter] = 'correct';
+      }
+    });
+    
+    setAssignments(correctAssignments);
+    setVerifiedLetters(correctVerified);
     setSelectedLetter(null);
     setSelectedDigit(null);
     setHintMessage(null);
@@ -301,6 +382,20 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         resetDomains[letter] = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       }
     });
+    
+    // Réduire les domaines pour les lettres correctes conservées
+    Object.entries(correctAssignments).forEach(([letter, value]) => {
+      const numValue = Number(value);
+      resetDomains[letter] = new Set([numValue]);
+      
+      // Retirer cette valeur des autres domaines
+      letters.forEach(otherLetter => {
+        if (otherLetter !== letter) {
+          resetDomains[otherLetter].delete(numValue);
+        }
+      });
+    });
+    
     setLetterDomains(resetDomains);
   };
 
@@ -348,7 +443,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
   const handleTouchStart = (digit: string, e: React.TouchEvent) => {
     if (usedDigits.has(digit)) return;
     
-    e.preventDefault();
     e.stopPropagation();
     
     const touch = e.touches[0];
@@ -364,14 +458,27 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     setHighlightedLetters(new Set(constraints.possibleLetters));
   };
 
-  const getLetterConstraintsInfo = (letter: string) => {
+  const handleTouchStartFromLetter = (letter: string, e: React.TouchEvent) => {
+    if (verifiedLetters[letter] === 'correct' || !assignments[letter]) return;
+    
+    e.stopPropagation();
+    
+    const touch = e.touches[0];
+    const digit = assignments[letter];
+    setTouchDraggedDigit(digit);
+    setDraggedFromLetter(letter);
+    setTouchPosition({ x: touch.clientX, y: touch.clientY });
+    setErrorMessage(null);
+    
+    // Highlight which letters this digit can be assigned to
     const numAssignments = Object.fromEntries(
       Object.entries(assignments).map(([k, v]) => [k, Number(v)])
     );
-    const constraints = getLetterConstraints(equation, letter, numAssignments);
-    
-    return constraints;
+    const constraints = getDigitConstraints(equation, Number(digit), numAssignments);
+    setHighlightedLetters(new Set(constraints.possibleLetters));
   };
+
+
 
   const renderEquation = () => {
     const parts: React.ReactNode[] = [];
@@ -390,13 +497,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
               isHighlighted ? 'scale-110' : ''
             }`}
           >
-            <span className={`text-base md:text-3xl lg:text-8xl text-gray-800 font-mono lg:font-bold ${
+            <span className={`text-2xl md:text-5xl lg:text-9xl text-gray-800 font-mono font-bold ${
               isHighlighted ? 'text-purple-600 animate-pulse' : ''
             }`}>
               {char}
             </span>
             {hasAssignment && (
-              <span className="absolute -bottom-6 md:-bottom-12 lg:-bottom-20 left-1/2 -translate-x-1/2 text-sm md:text-2xl lg:text-5xl text-purple-600 font-mono lg:font-bold animate-fade-in">
+              <span className="absolute -bottom-6 md:-bottom-16 lg:-bottom-24 left-1/2 -translate-x-1/2 text-xl md:text-4xl lg:text-6xl text-purple-600 font-mono font-bold animate-fade-in">
                 {hasAssignment}
               </span>
             )}
@@ -416,7 +523,7 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         
         // Ajouter l'espace ou l'opérateur
         parts.push(
-          <span key={`op-${index}`} className="text-base md:text-3xl lg:text-8xl text-gray-800 font-mono lg:font-bold px-0.5">
+          <span key={`op-${index}`} className="text-2xl md:text-5xl lg:text-9xl text-gray-800 font-mono font-bold px-0.5">
             {char}
           </span>
         );
@@ -450,13 +557,16 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     
     const newVerified = { ...verifiedLetters };
     const newAssignments = { ...assignments };
+    const newVerificationEliminated: Record<string, Set<number>> = {};
+    Object.entries(verificationEliminated).forEach(([k, v]) => {
+      newVerificationEliminated[k] = new Set(v);
+    });
     let correctCount = 0;
     let incorrectCount = 0;
 
-    // Only verify individual letters if solution is provided
+    // If no solution provided, use mathematical validation
     if (!solution) {
-      setHintMessage('Mode vérification désactivé : aucune solution de référence fournie');
-      setTimeout(() => setHintMessage(null), 3000);
+      checkSolution();
       return;
     }
 
@@ -501,20 +611,46 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         
         // Remove the incorrect assignment
         delete newAssignments[letter];
+
+        // Permanently mark this digit as eliminated for this letter
+        if (!newVerificationEliminated[letter]) {
+          newVerificationEliminated[letter] = new Set();
+        }
+        newVerificationEliminated[letter].add(Number(digit));
       }
     });
 
     setLetterDomains(newDomains);
     setVerifiedLetters(newVerified);
     setAssignments(newAssignments);
+    setVerificationEliminated(newVerificationEliminated);
 
     // Show feedback message
     if (incorrectCount === 0 && correctCount > 0) {
-      setHintMessage(`✓ Toutes les attributions sont correctes ! (${correctCount})`);
+      // Vérifier si TOUTES les lettres sont assignées correctement
+      if (correctCount === letters.length) {
+        setHintMessage('🎉 Félicitations ! Vous avez résolu le cryptarithme !');
+        
+        // Marquer toutes les lettres comme correctes
+        const allCorrect: Record<string, 'correct' | 'incorrect' | null> = {};
+        letters.forEach(letter => {
+          if (newAssignments[letter]) {
+            allCorrect[letter] = 'correct';
+          }
+        });
+        setVerifiedLetters(allCorrect);
+        
+        // Déclencher la résolution
+        if (onSolved) {
+          setTimeout(() => onSolved(), 1000);
+        }
+      } else {
+        setHintMessage(`✓ Toutes les attributions sont correctes ! (${correctCount}/${letters.length})`);
+      }
     } else if (incorrectCount > 0 && correctCount > 0) {
       setHintMessage(`${correctCount} correct(s), ${incorrectCount} incorrect(s). Les chiffres incorrects ont été retirés.`);
     } else if (incorrectCount > 0) {
-      setHintMessage(`✗ Aucune attribution correcte. Les chiffres incorrects ont été retirés et les domaines mis à jour.`);
+      setHintMessage(`✗ Aucune attribution correcte. Les chiffres incorrects ont été retirés et les valeurs possibles mises à jour.`);
     }
 
     // Notifier le parent qu'une vérification a été effectuée
@@ -538,8 +674,107 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
     setTimeout(() => setHintMessage(null), 4000);
   };
 
+  // Spacer fantôme pour mobile - prend la même hauteur que le panneau fixe
+  const mobileControlsSpacer = isMobile && (
+    <div className="bg-transparent border-t-2 border-transparent">
+      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 px-2">
+          <div className="h-12 sm:w-auto sm:min-w-[180px]"></div>
+          <div className="h-12 sm:w-auto sm:min-w-[200px]"></div>
+        </div>
+
+        {/* Available Digits */}
+        <div>
+          <p className="text-xs md:text-sm mb-2 text-center font-medium invisible">Spacer</p>
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            {availableDigits.map(digit => (
+              <div
+                key={digit}
+                className="w-12 h-12 md:w-14 md:h-14 flex-shrink-0"
+              >
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render mobile controls separately - fixed at bottom
+  const mobileControls = isMobile && (
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
+      <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 px-2">
+          <PrimaryButton
+            onClick={handleVerify}
+            variant="primary"
+            leftIcon={<Check className="w-6 h-6" />}
+            className="sm:w-auto sm:min-w-[180px]"
+          >
+            Vérifier
+          </PrimaryButton>
+          
+          <PrimaryButton
+            onClick={handleReset}
+            variant="secondary"
+            leftIcon={<RotateCcw className="w-6 h-6" />}
+            className="sm:w-auto sm:min-w-[200px]"
+          >
+            Réinitialiser
+          </PrimaryButton>
+        </div>
+
+        {/* Available Digits */}
+        <div>
+          <p className="text-xs md:text-sm text-gray-700 mb-2 text-center font-medium">
+            {selectedDigit 
+              ? '👆 Appuyez sur une lettre pour assigner' 
+              : touchDraggedDigit
+              ? '👉 Maintenez et déposez sur une lettre'
+              : '✋ Glissez un chiffre sur une lettre'
+            }
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            {availableDigits.map(digit => {
+              const isSelected = selectedDigit === digit;
+              const isUsed = usedDigits.has(digit);
+              const isTouchDragged = touchDraggedDigit === digit;
+              
+              return (
+                <div
+                  key={digit}
+                  draggable={!isUsed}
+                  onDragStart={() => handleDragStart(digit)}
+                  onTouchStart={(e) => handleTouchStart(digit, e)}
+                  onClick={() => !isUsed && handleDigitClick(digit)}
+                  className={`
+                    w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-lg md:rounded-xl flex-shrink-0
+                    text-xl md:text-2xl font-mono transition-all duration-300
+                    ${isUsed
+                      ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed'
+                      : isTouchDragged
+                      ? 'bg-gradient-to-br from-purple-400 to-pink-400 text-white shadow-2xl scale-75 opacity-50'
+                      : isSelected
+                      ? 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-xl scale-110'
+                      : 'bg-gradient-to-br from-white to-gray-50 border-2 border-gray-300 text-gray-800 hover:border-purple-400 hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer cursor-move'
+                    }
+                  `}
+                  style={{ touchAction: 'none' }}
+                >
+                  {digit}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-8 sm:space-y-5 md:space-y-6 relative pb-[32rem] md:pb-56">
+    <div className={isMobile ? 'h-full overflow-y-auto space-y-8 sm:space-y-5 md:space-y-6 px-4' : 'space-y-8 sm:space-y-5 md:space-y-6 relative'}>
       {/* Élément visuel qui suit le doigt pendant le drag tactile */}
       {touchDraggedDigit && touchPosition && (
         <>
@@ -567,18 +802,20 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       )}
       {/* Error Message */}
       {errorMessage && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-lg">
-          <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-          <span className="text-red-900">{errorMessage}</span>
-        </div>
+        <AlertBanner
+          variant="error"
+          message={errorMessage}
+          className="animate-fade-in shadow-lg"
+        />
       )}
 
       {/* Hint Message */}
       {hintMessage && (
-        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-lg">
-          <Lightbulb className="w-6 h-6 text-blue-600 flex-shrink-0" />
-          <span className="text-blue-900">{hintMessage}</span>
-        </div>
+        <AlertBanner
+          variant="info"
+          message={hintMessage}
+          className="animate-fade-in shadow-lg"
+        />
       )}
 
       {/* Equation Display */}
@@ -591,9 +828,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       </div>
 
       {/* Letter Assignment Zones */}
-      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} gap-3 sm:gap-2.5 md:gap-3`}>
+      <div className={`${isMobile ? 'grid grid-cols-2' : 'flex flex-wrap justify-center'} gap-3 sm:gap-2.5 md:gap-3`}>
         {letters.map(letter => {
-          const isHighlighted = highlightedLetters.has(letter);
           const isSelected = selectedLetter === letter;
           const hasAssignment = !!assignments[letter];
           const verificationStatus = verifiedLetters[letter];
@@ -612,11 +848,13 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           // Filtrer avec les domaines stockés (qui sont réduits lors de la vérification)
           const storedDomain = letterDomains[letter] || new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
           const possibleValues = constraints.possibleValues.filter(val => storedDomain.has(val));
+          const isExpanded = expandedLetters[letter] ?? false;
           
           return (
             <div
               key={letter}
               data-letter={letter}
+              draggable={hasAssignment && !isLocked}
               onDragOver={(e) => {
                 if (!isLocked) {
                   e.preventDefault();
@@ -627,14 +865,73 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                   handleDrop(letter);
                 }
               }}
+              onDragStart={(e) => {
+                if (hasAssignment && !isLocked) {
+                  setDraggedDigit(assignments[letter]);
+                  setDraggedFromLetter(letter);
+                  e.dataTransfer.effectAllowed = 'move';
+                  
+                  // Créer une image de drag personnalisée pour afficher juste le chiffre
+                  const dragImage = document.createElement('div');
+                  dragImage.style.cssText = `
+                    position: absolute;
+                    top: -1000px;
+                    width: 56px;
+                    height: 56px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(to bottom right, rgb(216, 180, 254), rgb(251, 207, 232));
+                    border-radius: 12px;
+                    font-size: 24px;
+                    font-family: monospace;
+                    font-weight: bold;
+                    color: rgb(147, 51, 234);
+                    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                  `;
+                  dragImage.textContent = assignments[letter];
+                  document.body.appendChild(dragImage);
+                  
+                  e.dataTransfer.setDragImage(dragImage, 28, 28);
+                  
+                  // Nettoyer après un court délai
+                  setTimeout(() => {
+                    document.body.removeChild(dragImage);
+                  }, 0);
+                }
+              }}
+              onDragEnd={() => {
+                // Si draggedFromLetter existe encore, cela signifie que le drop n'a pas réussi
+                // donc on désassigne le chiffre de la lettre source
+                if (draggedFromLetter) {
+                  const newAssignments = { ...assignments };
+                  delete newAssignments[draggedFromLetter];
+                  setAssignments(newAssignments);
+                  
+                  // Réinitialiser le statut de vérification
+                  const newVerified = { ...verifiedLetters };
+                  newVerified[draggedFromLetter] = null;
+                  setVerifiedLetters(newVerified);
+                }
+                
+                setDraggedDigit(null);
+                setDraggedFromLetter(null);
+                setHighlightedLetters(new Set());
+              }}
               onClick={() => {
-                if (!isLocked) {
+                if (!isLocked && !hasAssignment) {
                   handleLetterClick(letter);
                 }
               }}
+              onTouchStart={(e) => {
+                if (hasAssignment && !isLocked) {
+                  handleTouchStartFromLetter(letter, e);
+                }
+              }}
+              style={!isMobile ? { width: CARD_WIDTH, flexShrink: 0 } : undefined}
               className={`
                 relative p-3 sm:p-1.5 md:p-2 rounded-xl sm:rounded-lg border-2 border-dashed transition-all duration-300 overflow-hidden
-                ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}
+                ${isLocked ? 'cursor-not-allowed' : hasAssignment ? 'cursor-move' : 'cursor-pointer'}
                 ${verificationStatus === 'correct'
                   ? 'bg-gradient-to-br from-green-100 to-emerald-100 border-green-400 shadow-lg scale-105'
                   : verificationStatus === 'incorrect'
@@ -662,29 +959,44 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
               )}
 
               <div className="text-center min-w-0">
-                <div className="text-lg sm:text-sm md:text-base text-gray-800 mb-1 sm:mb-0.5 font-semibold truncate">{letter}</div>
-                <div className="h-7 sm:h-5 md:h-6 flex items-center justify-center">
-                  {assignments[letter] ? (
-                    <span className={`text-xl sm:text-sm md:text-base font-mono animate-fade-in ${
-                      verificationStatus === 'correct' ? 'text-green-600' :
-                      verificationStatus === 'incorrect' ? 'text-red-600' :
-                      'text-purple-600'
-                    }`}>
+                <div className="text-2xl sm:text-lg md:text-xl text-gray-800 mb-1 sm:mb-0.5 font-semibold truncate">{letter}</div>
+                <div className="h-9 sm:h-7 md:h-8 flex items-center justify-center">
+                  {assignments[letter] && (
+                    <span 
+                      className={`text-3xl sm:text-xl md:text-2xl font-mono animate-fade-in font-bold ${
+                        verificationStatus === 'correct' ? 'text-green-600' :
+                        verificationStatus === 'incorrect' ? 'text-red-600' :
+                        'text-purple-600'
+                      }`}
+                    >
                       {assignments[letter]}
                     </span>
-                  ) : (
-                    <span className="text-xs sm:text-[9px] md:text-[10px] text-gray-400">Déposez ici</span>
                   )}
                 </div>
                 
-                {/* Domain Display - Toujours affiché sauf si la lettre est verrouillée */}
+                {/* Domain Toggle Button & Display */}
                 {!isLocked && possibleValues.length > 0 && (
                   <div className={`mt-2 pt-2 border-t border-gray-200 min-w-0 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
-                    <div className={`text-gray-500 font-medium flex items-center justify-center gap-1 ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px] mb-1 sm:mb-0.5 flex-col sm:flex-row' : 'text-[11px] mb-2'}`}>
-                      <span>Domaine</span>
-                      <span className={`text-gray-400 ${isMobile ? 'hidden sm:inline text-[7px] md:text-[8px]' : 'text-[9px]'}`}>(cliquer pour éliminer)</span>
-                    </div>
-                    <div className={`flex flex-wrap justify-center overflow-hidden ${isMobile ? 'gap-1 sm:gap-0.5' : 'gap-1.5'}`}>
+                    {/* Toggle button - Mobile only */}
+                    {isMobile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedLetters(prev => ({ ...prev, [letter]: !isExpanded }));
+                        }}
+                        className="w-full flex items-center justify-center text-gray-600 hover:text-gray-800 transition-colors mb-1.5"
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </button>
+                    )}
+                    
+                    {/* Domain values - Always shown on PC, toggle on mobile */}
+                    {(!isMobile || isExpanded) && (
+                      <div className={`flex flex-wrap justify-center ${isMobile ? 'gap-2 sm:gap-1.5 md:gap-2 leading-relaxed' : 'gap-1 leading-relaxed'}`}>
                       {possibleValues.map(val => {
                         const isEliminated = eliminatedValues[letter]?.has(val);
                         const isCurrent = hasAssignment && Number(assignments[letter]) === val;
@@ -695,8 +1007,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                             onClick={(e) => toggleEliminatedValue(letter, val, e)}
                             className={`font-mono transition-all cursor-pointer flex-shrink-0 ${
                               isMobile
-                                ? `px-1 sm:px-0.5 py-0.5 sm:py-0 rounded sm:rounded-sm text-[10px] sm:text-[8px] md:text-[9px] hover:scale-110`
-                                : `w-7 h-7 flex items-center justify-center rounded-lg text-[12px] hover:scale-110 shadow-sm border`
+                                ? `px-5 py-2 rounded text-[20px] sm:text-[20px] md:text-[30px] hover:scale-105 min-w-[60px]`
+                                : `px-3 py-1 rounded-lg text-[20px] hover:scale-105 shadow-sm border min-w-[35px]`
                             } ${
                               isCurrent
                                 ? isMobile
@@ -704,8 +1016,8 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                                   : 'bg-purple-100 text-purple-700 font-bold border-purple-300 ring-2 ring-purple-300'
                                 : isEliminated
                                 ? isMobile
-                                  ? 'bg-red-100 text-red-400 line-through opacity-50'
-                                  : 'bg-red-50 text-red-300 line-through opacity-40 border-red-200'
+                                  ? 'bg-gray-200 text-gray-400 line-through opacity-60'
+                                  : 'bg-gray-100 text-gray-400 line-through opacity-50 border-gray-300'
                                 : isMobile
                                   ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                   : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200 hover:border-blue-400 hover:shadow-md'
@@ -715,14 +1027,17 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
                           </button>
                         );
                       })}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {/* Empty Domain Warning */}
                 {!isLocked && possibleValues.length === 0 && (
                   <div className={`mt-2 pt-2 border-t border-red-200 ${isMobile ? 'sm:mt-1 sm:pt-1 md:mt-1.5 md:pt-1.5' : ''}`}>
-                    <div className={`text-red-600 font-medium truncate ${isMobile ? 'text-[10px] sm:text-[8px] md:text-[9px]' : 'text-[11px]'}`}>Domaine vide !</div>
+                    <div className={`text-center text-red-600 font-medium ${isMobile ? 'text-[9px]' : 'text-[10px]'}`}>
+                      ⚠️ Aucune valeur
+                    </div>
                   </div>
                 )}
               </div>
@@ -731,104 +1046,35 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
         })}
       </div>
 
-      {/* Sticky Bar en bas - Mobile uniquement */}
-      {isMobile && <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-200 shadow-2xl z-40">
-        <div className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-          {/* Action Buttons */}
-          <div className="flex flex-row justify-center gap-3">
-            <button
-              onClick={handleVerify}
-              className="flex items-center justify-center gap-2 px-6 md:px-8 py-2.5 md:py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-sm md:text-base font-medium"
-            >
-              <Check className="w-4 h-4 md:w-5 md:h-5" />
-              Vérifier
-            </button>
-            
-            <button
-              onClick={handleReset}
-              className="flex items-center justify-center gap-2 px-5 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-lg md:rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-sm md:text-base font-medium"
-            >
-              <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
-              Réinitialiser
-            </button>
-          </div>
-
-          {/* Available Digits */}
-          <div>
-            <p className="text-xs md:text-sm text-gray-700 mb-2 text-center font-medium">
-              {selectedDigit 
-                ? '👆 Appuyez sur une lettre pour assigner' 
-                : touchDraggedDigit
-                ? '👉 Maintenez et déposez sur une lettre'
-                : '✋ Maintenez un chiffre ou cliquez pour sélectionner'
-              }
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-              {availableDigits.map(digit => {
-                const isSelected = selectedDigit === digit;
-                const isUsed = usedDigits.has(digit);
-                const isTouchDragged = touchDraggedDigit === digit;
-                
-                return (
-                  <div
-                    key={digit}
-                    draggable={!isUsed}
-                    onDragStart={() => handleDragStart(digit)}
-                    onTouchStart={(e) => handleTouchStart(digit, e)}
-                    onClick={() => !isUsed && handleDigitClick(digit)}
-                    className={`
-                      w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-lg md:rounded-xl flex-shrink-0
-                      text-xl md:text-2xl font-mono transition-all duration-300
-                      ${isUsed
-                        ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed'
-                        : isTouchDragged
-                        ? 'bg-gradient-to-br from-purple-400 to-pink-400 text-white shadow-2xl scale-75 opacity-50'
-                        : isSelected
-                        ? 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white shadow-xl scale-110'
-                        : 'bg-gradient-to-br from-white to-gray-50 border-2 border-gray-300 text-gray-800 hover:border-purple-400 hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer cursor-move'
-                      }
-                    `}
-                    style={{ touchAction: 'none' }}
-                  >
-                    {digit}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>}
-
-      {/* Espace blanc en bas - uniquement mobile */}
-      {isMobile && <div className="bg-white h-32"></div>}
-
       {/* Boutons et chiffres pour PC - intégré au bloc */}
       {!isMobile && <div className="mt-6 space-y-4">
         {/* Action Buttons */}
         <div className="flex flex-row justify-center gap-3">
-          <button
+          <PrimaryButton
             onClick={handleVerify}
-            className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+            variant="primary"
+            leftIcon={<Check className="w-5 h-5" />}
+            className="hover:scale-105"
           >
-            <Check className="w-5 h-5" />
             Vérifier
-          </button>
+          </PrimaryButton>
           
-          <button
+          <PrimaryButton
             onClick={handleReset}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-105 text-base font-medium"
+            variant="secondary"
+            leftIcon={<RotateCcw className="w-5 h-5" />}
+            className="hover:scale-105"
           >
-            <RotateCcw className="w-5 h-5" />
             Réinitialiser
-          </button>
+          </PrimaryButton>
         </div>
 
         {/* Available Digits */}
         <div>
           <p className="text-sm text-gray-700 mb-2 text-center font-medium">
             {selectedDigit 
-              ? '👆 Appuyez sur une lettre pour assigner' 
-              : '✋ Cliquez sur un chiffre pour sélectionner'
+              ? '👆 Cliquez sur une lettre pour assigner' 
+              : '✋ Glissez-déposez un chiffre sur une lettre'
             }
           </p>
           <div className="flex flex-wrap justify-center gap-3">
@@ -869,13 +1115,19 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
           </p>
           <ul className="text-xs md:text-sm space-y-1 text-left max-w-2xl mx-auto">
             <li>• Les lettres en début de mot ne peuvent pas être 0</li>
-            <li className="hidden md:list-item">• Cliquez sur une valeur du domaine pour l'éliminer manuellement (comme les drapeaux du démineur)</li>
-            <li className="md:hidden">• Cliquez sur une valeur du domaine pour l'éliminer</li>
+            <li className="hidden md:list-item">• Cliquez sur une valeur possible pour l'éliminer manuellement (comme les drapeaux du démineur)</li>
+            <li className="md:hidden">• Cliquez sur une valeur possible pour l'éliminer</li>
             <li>• Cliquez sur un chiffre pour voir où il peut aller</li>
             {easyMode && <li>• En mode facile, les mauvaises décisions sont bloquées</li>}
           </ul>
         </div>
       )}
+      
+      {/* Spacer fantôme - caché par le panneau fixe mais permet le scroll */}
+      {mobileControlsSpacer}
+      
+      {/* Mobile controls - Fixed at bottom */}
+      {mobileControls}
     </div>
   );
 }

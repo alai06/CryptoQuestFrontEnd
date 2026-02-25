@@ -1,5 +1,6 @@
-import { BookOpen, Lightbulb, Wand2, Gamepad2, Trophy, ArrowRight, Star, Sparkles } from 'lucide-react';
+import { BookOpen, Lightbulb, Wand2, Gamepad2, Trophy, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { PrimaryButton } from './ui';
 
 interface HomeScreenProps {
   onNavigate: (screen: 'tutorial' | 'solver' | 'generator' | 'game' | 'progress') => void;
@@ -43,31 +44,31 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
               <div className="flex flex-wrap items-center gap-4">
                 {!tutorialCompleted ? (
                   <>
-                    <button
+                    <PrimaryButton
                       onClick={() => onNavigate('tutorial')}
-                      className="group flex items-center gap-3 px-8 py-4 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all"
+                      variant="primary"
+                      leftIcon={<BookOpen className="w-5 h-5" strokeWidth={1.5} />}
+                      rightIcon={<ArrowRight className="w-4 h-4" strokeWidth={1.5} />}
                     >
-                      <BookOpen className="w-5 h-5" strokeWidth={1.5} />
-                      <span className="text-[15px] font-medium">Commencer le tutoriel</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={1.5} />
-                    </button>
+                      Commencer le tutoriel
+                    </PrimaryButton>
                   </>
                 ) : (
                   <>
-                    <button
+                    <PrimaryButton
                       onClick={() => onNavigate('game')}
-                      className="group flex items-center gap-3 px-8 py-4 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all"
+                      variant="primary"
+                      leftIcon={<Gamepad2 className="w-5 h-5" strokeWidth={1.5} />}
+                      rightIcon={<ArrowRight className="w-4 h-4" strokeWidth={1.5} />}
                     >
-                      <Gamepad2 className="w-5 h-5" strokeWidth={1.5} />
-                      <span className="text-[15px] font-medium">Continuer à jouer</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={1.5} />
-                    </button>
-                    <button
+                      Continuer à jouer
+                    </PrimaryButton>
+                    <PrimaryButton
                       onClick={() => onNavigate('solver')}
-                      className="px-8 py-4 bg-white border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-all"
+                      variant="secondary"
                     >
-                      <span className="text-[15px] font-medium">Mode Résolution</span>
-                    </button>
+                      Mode Résolution
+                    </PrimaryButton>
                   </>
                 )}
               </div>
@@ -77,27 +78,37 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => onNavigate('solver')}
-                className="group flex items-center gap-4 p-6 bg-white border border-[#E5E5E5] rounded-[12px] hover:border-[#0096BC] transition-all text-left"
+                className="bg-white border border-[#E5E5E5] rounded-[16px] p-5 hover:bg-[#FBFBFD] hover:border-[#D1D1D6] transition-all text-left"
               >
-                <div className="w-10 h-10 rounded-[8px] bg-[#E8F7FB] flex items-center justify-center flex-shrink-0">
-                  <Lightbulb className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Résolution</div>
-                  <div className="text-[13px] text-[#86868B]">Aide automatique</div>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-10 h-10 rounded-[8px] flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(0, 150, 188, 0.1)' }}
+                  >
+                    <Lightbulb className="w-5 h-5" style={{ color: '#0096BC' }} strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <div className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Résolution</div>
+                    <div className="text-[13px] text-[#86868B]">Aide automatique</div>
+                  </div>
                 </div>
               </button>
 
               <button
                 onClick={() => onNavigate('generator')}
-                className="group flex items-center gap-4 p-6 bg-white border border-[#E5E5E5] rounded-[12px] hover:border-[#0096BC] transition-all text-left"
+                className="bg-white border border-[#E5E5E5] rounded-[16px] p-5 hover:bg-[#FBFBFD] hover:border-[#D1D1D6] transition-all text-left"
               >
-                <div className="w-10 h-10 rounded-[8px] bg-[#E8F7FB] flex items-center justify-center flex-shrink-0">
-                  <Wand2 className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Génération</div>
-                  <div className="text-[13px] text-[#86868B]">Créez vos puzzles</div>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-10 h-10 rounded-[8px] flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(0, 150, 188, 0.1)' }}
+                  >
+                    <Wand2 className="w-5 h-5" style={{ color: '#0096BC' }} strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <div className="text-[14px] font-semibold text-[#1D1D1F] mb-1">Génération</div>
+                    <div className="text-[13px] text-[#86868B]">Créez vos puzzles</div>
+                  </div>
                 </div>
               </button>
             </div>
@@ -106,45 +117,47 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
           {/* Sidebar - 1/3 width */}
           <div className="lg:col-span-1 flex flex-col gap-6 py-16">
             {/* Stats Card */}
-            <div className="bg-white border border-[#E5E5E5] rounded-[16px] p-8">
+            <div className="bg-white border border-[#E5E5E5] rounded-[20px] p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-[8px] bg-[#0096BC] flex items-center justify-center">
+                <div 
+                  className="w-10 h-10 rounded-[8px] flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: '#0096BC' }}
+                >
                   <Trophy className="w-5 h-5 text-white" strokeWidth={1.5} />
                 </div>
                 <h3 className="text-[16px] font-semibold text-[#1D1D1F]">Progression</h3>
               </div>
 
               <div className="space-y-4 mb-6">
+                {/* Score total */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[13px] text-[#86868B]">Score total</span>
-                    <span className="text-[18px] font-bold text-[#1D1D1F]">{totalScore}</span>
+                    <span className="text-[14px] font-semibold text-[#1D1D1F]">{totalScore}/1000</span>
                   </div>
                   <div className="h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-[#0096BC] rounded-full transition-all"
-                      style={{ width: `${Math.min((totalScore / 1000) * 100, 100)}%` }}
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${(totalScore / 1000) * 100}%`,
+                        backgroundColor: '#0096BC'
+                      }}
                     />
                   </div>
                 </div>
 
+                {/* Niveaux */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between">
                     <span className="text-[13px] text-[#86868B]">Niveaux</span>
-                    <span className="text-[18px] font-bold text-[#1D1D1F]">{completedLevels}<span className="text-[14px] text-[#86868B] font-normal">/5</span></span>
-                  </div>
-                  <div className="h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#00AFD7] rounded-full transition-all"
-                      style={{ width: `${(completedLevels / 5) * 100}%` }}
-                    />
+                    <span className="text-[14px] font-semibold text-[#1D1D1F]">{completedLevels}</span>
                   </div>
                 </div>
               </div>
 
               <button
                 onClick={() => onNavigate('progress')}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#F5F5F7] text-[#1D1D1F] rounded-[8px] hover:bg-[#E5E5E5] transition-all text-[14px] font-medium"
+                className="w-full bg-[#F5F5F7] text-[#1D1D1F] px-6 py-3 rounded-[12px] font-medium text-[15px] transition-all hover:bg-[#E8E8ED] flex items-center justify-center gap-2"
               >
                 Voir les détails
                 <ArrowRight className="w-4 h-4" strokeWidth={1.5} />

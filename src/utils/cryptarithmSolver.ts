@@ -50,23 +50,24 @@ export function clearGameStateCache() {
 
 // Get constraints for a specific letter
 export function getLetterConstraints(equation: string, letter: string, currentAssignments: Record<string, number>): LetterConstraints {
-  const parts = equation.replace(/\s/g, '').split(/[+=]/);
-  const operands = parts.slice(0, -1);
-  const result = parts[parts.length - 1];
-  
-  // Get all words in the equation
-  const allWords = [...operands, result];
-  
-  // Check if letter is at the start of any word
-  const isFirstLetter = allWords.some(word => word[0] === letter);
-  
+  // Extract all words, handling compound equations (&&, ;)
+  // Only multi-character words have the no-leading-zero constraint
+  const allWords: string[] = [];
+  const subEquations = equation.split(/\s*(?:&&|;)\s*/).filter(e => e.length > 0);
+  subEquations.forEach(subEq => {
+    const words = subEq.replace(/\s/g, '').match(/[A-Z]+/g) || [];
+    allWords.push(...words);
+  });
+
+  const isFirstLetter = allWords.some(word => word.length > 1 && word[0] === letter);
+
   // Get used digits
   const usedDigits = new Set(Object.values(currentAssignments));
-  
+
   // Calculate possible values
   const possibleValues: number[] = [];
   const impossibleValues: number[] = [];
-  
+
   for (let digit = 0; digit <= 9; digit++) {
     if (usedDigits.has(digit)) {
       impossibleValues.push(digit);
@@ -76,12 +77,12 @@ export function getLetterConstraints(equation: string, letter: string, currentAs
       possibleValues.push(digit);
     }
   }
-  
+
   let reason = '';
   if (isFirstLetter) {
     reason = `${letter} est en début de mot, donc ne peut pas être 0`;
   }
-  
+
   return {
     letter,
     possibleValues,
@@ -93,25 +94,26 @@ export function getLetterConstraints(equation: string, letter: string, currentAs
 // Get constraints for a specific digit
 export function getDigitConstraints(equation: string, digit: number, currentAssignments: Record<string, number>): DigitConstraints {
   const letters = Array.from(new Set(equation.match(/[A-Z]/g) || []));
-  const parts = equation.replace(/\s/g, '').split(/[+=]/);
-  const operands = parts.slice(0, -1);
-  const result = parts[parts.length - 1];
-  const allWords = [...operands, result];
-  
-  // Get first letters (cannot be 0)
+
+  // Extract first letters of multi-character words, handling compound equations (&&, ;)
+  // Only multi-character words have the no-leading-zero constraint
   const firstLetters = new Set<string>();
-  allWords.forEach(word => {
-    if (word.length > 0) {
-      firstLetters.add(word[0]);
-    }
+  const subEquations = equation.split(/\s*(?:&&|;)\s*/).filter(e => e.length > 0);
+  subEquations.forEach(subEq => {
+    const words = subEq.replace(/\s/g, '').match(/[A-Z]+/g) || [];
+    words.forEach(word => {
+      if (word.length > 1) {
+        firstLetters.add(word[0]);
+      }
+    });
   });
-  
+
   // Get assigned letters
   const assignedLetters = new Set(Object.keys(currentAssignments));
-  
+
   const possibleLetters: string[] = [];
   const impossibleLetters: string[] = [];
-  
+
   for (const letter of letters) {
     if (assignedLetters.has(letter)) {
       impossibleLetters.push(letter);
@@ -121,7 +123,7 @@ export function getDigitConstraints(equation: string, digit: number, currentAssi
       possibleLetters.push(letter);
     }
   }
-  
+
   return {
     digit,
     possibleLetters,
@@ -280,10 +282,8 @@ export function solveCryptarithm(equation: string): SolverResult {
  * @returns true if the equation is mathematically correct with the given assignments
  */
 export function validateSolution(equation: string, assignments: Record<string, string>): boolean {
-  // Parse equation
-  const parts = equation.replace(/\s/g, '').split(/[+=]/);
-  const operands = parts.slice(0, -1);
-  const result = parts[parts.length - 1];
+  // Split into sub-equations for compound equations (&&, ;)
+  const subEquations = equation.split(/\s*(?:&&|;)\s*/).filter(e => e.length > 0);
 
   // Convert assignments to numbers
   const numAssignments: Record<string, number> = {};
@@ -291,7 +291,7 @@ export function validateSolution(equation: string, assignments: Record<string, s
     numAssignments[letter] = Number(digit);
   }
 
-  // Get all letters
+  // Get all letters used in this equation
   const allLetters = Array.from(new Set(equation.match(/[A-Z]/g) || []));
 
   // Check if all letters are assigned
@@ -301,18 +301,14 @@ export function validateSolution(equation: string, assignments: Record<string, s
     }
   }
 
-  // Check for duplicate digits
-  const usedDigits = new Set(Object.values(numAssignments));
-  if (usedDigits.size !== Object.keys(numAssignments).length) {
-    return false; // Duplicate digits used
-  }
-
-  // Check leading zeros
-  const allWords = [...operands, result];
-  for (const word of allWords) {
-    if (word.length > 1 && numAssignments[word[0]] === 0) {
-      return false; // Leading zero not allowed
+  // Check for duplicate digits across all letters in the equation
+  const usedDigitsInEq: Record<number, string> = {};
+  for (const letter of allLetters) {
+    const digit = numAssignments[letter];
+    if (usedDigitsInEq[digit] !== undefined) {
+      return false; // Duplicate use of a digit
     }
+    usedDigitsInEq[digit] = letter;
   }
 
   // Evaluate function
@@ -325,11 +321,30 @@ export function validateSolution(equation: string, assignments: Record<string, s
     return value;
   }
 
-  // Calculate sum and verify
-  const sum = operands.reduce((acc, operand) => acc + evaluate(operand), 0);
-  const resultValue = evaluate(result);
+  // Validate each sub-equation arithmetically
+  for (const subEq of subEquations) {
+    const parts = subEq.replace(/\s/g, '').split(/[+=]/);
+    if (parts.length < 2) continue;
+    const operands = parts.slice(0, -1);
+    const result = parts[parts.length - 1];
 
-  return sum === resultValue;
+    // Check leading zeros (only multi-char words)
+    const allWords = [...operands, result];
+    for (const word of allWords) {
+      if (word.length > 1 && numAssignments[word[0]] === 0) {
+        return false; // Leading zero not allowed
+      }
+    }
+
+    // Sum of operands must equal result
+    const sum = operands.reduce((acc, operand) => acc + evaluate(operand), 0);
+    const resultValue = evaluate(result);
+    if (sum !== resultValue) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function generateCryptarithm(

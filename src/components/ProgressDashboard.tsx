@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, CheckCircle, Menu } from 'lucide-react';
 import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface ProgressDashboardProps {
@@ -16,12 +16,6 @@ interface Achievement {
   unlocked: boolean;
   requirement: string;
   category: 'completion' | 'performance' | 'speed' | 'collection';
-}
-
-interface Level {
-  id: number;
-  name: string;
-  xpRequired: number;
 }
 
 // Calcul de l'XP requis pour chaque niveau (progression exponentielle)
@@ -212,16 +206,27 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
   ];
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).length;
-  const categoryColors = {
-    completion: { bg: 'bg-[#E8F7FB]', border: 'border-[#0096BC]', icon: 'bg-[#0096BC]' },
-    performance: { bg: 'bg-[#FFFBF0]', border: 'border-[#FFD60A]', icon: 'bg-[#FFD60A]' },
-    speed: { bg: 'bg-[#FFE5F0]', border: 'border-[#FF3B7C]', icon: 'bg-[#FF3B7C]' },
-    collection: { bg: 'bg-[#F0E8FF]', border: 'border-[#9B51E0]', icon: 'bg-[#9B51E0]' },
-  };
 
   return (
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
+        {/* Mobile Header - Only on mobile */}
+        {isMobile && (
+          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onOpenSidebar}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+                aria-label="Menu"
+              >
+                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Progression</h1>
+              <div className="w-10 h-10"></div>
+            </div>
+          </div>
+        )}
+
         {/* Back Button - Mobile only */}
         {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
@@ -253,7 +258,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
 
         {/* Statistiques principales */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6">
+          <div className={isMobile ? "p-4" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6"}>
             <div className="flex items-center gap-3 mb-2">
               <CheckCircle className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
               <span className="text-[14px] text-[#86868B]">Cryptarithmes complétés</span>
@@ -261,7 +266,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
             <p className="text-[36px] text-[#1D1D1F] tracking-[-0.02em] font-bold">{completedCryptos}</p>
           </div>
 
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6">
+          <div className={isMobile ? "p-4" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6"}>
             <div className="flex items-center gap-3 mb-2">
               <Zap className="w-5 h-5 text-[#FF9500]" strokeWidth={1.5} />
               <span className="text-[14px] text-[#86868B]">XP Total</span>
@@ -269,7 +274,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
             <p className="text-[36px] text-[#1D1D1F] tracking-[-0.02em] font-bold">{totalXP}</p>
           </div>
 
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6">
+          <div className={isMobile ? "p-4" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6"}>
             <div className="flex items-center gap-3 mb-2">
               <Trophy className="w-5 h-5 text-[#FFD60A]" strokeWidth={1.5} />
               <span className="text-[14px] text-[#86868B]">Titres débloqués</span>
@@ -277,7 +282,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
             <p className="text-[36px] text-[#1D1D1F] tracking-[-0.02em] font-bold">{unlockedAchievements} / {achievements.length}</p>
           </div>
 
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6">
+          <div className={isMobile ? "p-4" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6"}>
             <div className="flex items-center gap-3 mb-2">
               <Target className="w-5 h-5 text-[#34C759]" strokeWidth={1.5} />
               <span className="text-[14px] text-[#86868B]">Score Total</span>
@@ -287,7 +292,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
         </div>
 
         {/* Répartition des étoiles */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
+        <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6"}>
           <h2 className="text-[24px] font-bold mb-6 tracking-[-0.02em]">Répartition des étoiles</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-[#FFE5F0] to-[#FFF0F7] rounded-[12px] p-6 border border-[#FF3B7C]/20">
@@ -322,7 +327,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
         </div>
 
         {/* Titres & Achievements */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
+        <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6"}>
           <h2 className="text-[24px] font-bold mb-6 tracking-[-0.02em]">Titres & Récompenses</h2>
           <p className="text-[14px] text-[#86868B] mb-6">
             Débloquez des titres en accomplissant des objectifs spécifiques
@@ -331,14 +336,13 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {achievements.map((achievement) => {
               const Icon = achievement.icon;
-              const colors = categoryColors[achievement.category];
               return (
                 <div
                   key={achievement.id}
                   className={`
                     rounded-[12px] border p-6 transition-all
                     ${achievement.unlocked
-                      ? `${colors.bg} ${colors.border}`
+                      ? 'bg-[#E8F7FB] border-[#0096BC]'
                       : 'bg-[#F5F5F7] border-[#E5E5E5] opacity-60'
                     }
                   `}
@@ -347,7 +351,7 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
                     <div className={`
                       w-12 h-12 rounded-[12px] flex items-center justify-center flex-shrink-0
                       ${achievement.unlocked
-                        ? `${colors.icon} text-white`
+                        ? 'bg-[#0096BC] text-white'
                         : 'bg-[#E5E5E5] text-[#86868B]'
                       }
                     `}>
@@ -355,11 +359,11 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
                     </div>
 
                     <div className="flex-1">
-                      <h3 className="text-[#1D1D1F] mb-1 font-semibold text-[16px]">{achievement.name}</h3>
+                      <h3 className={`mb-1 font-semibold text-[16px] ${achievement.unlocked ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>{achievement.name}</h3>
                       <p className="text-[#86868B] text-[13px] mb-2">{achievement.description}</p>
                       <p className="text-[12px] text-[#86868B]/80">{achievement.requirement}</p>
                       {achievement.unlocked && (
-                        <div className="mt-3 inline-flex items-center gap-1 bg-[#34C759]/10 text-[#34C759] px-3 py-1 rounded-full text-[12px] font-semibold">
+                        <div className="mt-3 inline-flex items-center gap-1 bg-[#0096BC]/10 text-[#0096BC] px-3 py-1 rounded-full text-[12px] font-semibold">
                           ✓ Débloqué
                         </div>
                       )}

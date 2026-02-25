@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
-import { generateCryptarithms as generateCryptarithmsAPI } from '../services/cryptatorApi';
+import { useState, useEffect, useRef } from 'react';
+import { Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
+import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
 import BackButtonWithProgress from './BackButtonWithProgress';
@@ -27,9 +27,14 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [selectedCryptarithm, setSelectedCryptarithm] = useState<GeneratedCryptarithm | null>(null);
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [customWordsText, setCustomWordsText] = useState<string>('');
-  const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [isCancelHovered, setIsCancelHovered] = useState(false);
+  const currentTaskIdRef = useRef<string | null>(null);
+  
+  // Generation mode
+  const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
+  const [language, setLanguage] = useState<string>('fr');
   
   // Advanced API options
   const [solutionLimit, setSolutionLimit] = useState<number>(5);
@@ -45,8 +50,8 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [crossGridSize, setCrossGridSize] = useState<number | undefined>(undefined);
 
-  const MAX_CRYPTARITHMS = 50;
   const MAX_CUSTOM_WORDS = 50;
+  const API_LIMITS = getApiLimits();
 
     // Charger les cryptarithmes sauvegardés au démarrage
   useEffect(() => {
@@ -83,23 +88,34 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   };
 
   const handleGenerate = async () => {
-    if (generated.length >= MAX_CRYPTARITHMS) {
-      setShowLimitWarning(true);
-      setTimeout(() => setShowLimitWarning(false), 5000);
-      return;
-    }
-
-    if (customWords.length === 0) {
+    // Validation selon le mode
+    if (generationMode === 'manual' && customWords.length === 0) {
       setError('Veuillez ajouter au moins un mot personnalisé');
       return;
     }
 
+    if (generationMode === 'doubly-true') {
+      if (!lowerBound || !upperBound) {
+        setError('Veuillez définir les bornes inférieure et supérieure pour le mode Doubly True');
+        return;
+      }
+      if (lowerBound >= upperBound) {
+        setError('La borne inférieure doit être strictement inférieure à la borne supérieure');
+        return;
+      }
+    }
+
     setGenerating(true);
     setError('');
+    setIsCancelHovered(false);
+
+    const taskId = crypto.randomUUID();
+    currentTaskIdRef.current = taskId;
 
     try {
       const response = await generateCryptarithmsAPI({
-        words: customWords,
+        words: generationMode === 'manual' ? customWords : [],
+        taskId: taskId,
         operatorSymbol: getOperatorSymbol(),
         solutionLimit: solutionLimit,
         timeLimit: timeLimit,
@@ -112,6 +128,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         threads: threads,
         allowLeadingZeros: allowLeadingZeros,
         crossGridSize: crossGridSize,
+        langCode: generationMode === 'doubly-true' ? language : undefined,
       });
 
       if (response.success && response.cryptarithms.length > 0) {
@@ -133,10 +150,30 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         setError(response.error || 'Aucun cryptarithme généré');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
+      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la génération';
+      // Don't show error if cancelled by user
+      if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
+        setError(errMsg);
+      }
     } finally {
       setGenerating(false);
+      setIsCancelHovered(false);
+      currentTaskIdRef.current = null;
     }
+  };
+
+  const handleCancelGenerate = async () => {
+    const taskId = currentTaskIdRef.current;
+    if (taskId) {
+      currentTaskIdRef.current = null;
+      try {
+        await cancelTask(taskId);
+      } catch {
+        // ignore
+      }
+    }
+    setGenerating(false);
+    setIsCancelHovered(false);
   };
 
   const handleExportAll = () => {
@@ -174,50 +211,11 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = JSON.parse(e.target?.result as string);
-        if (data.cryptarithms) {
-          const importedCryptarithms: GeneratedCryptarithm[] = data.cryptarithms.map((c: any) => ({
-            id: Date.now().toString(),
-            equation: c.equation,
-            solution: c.solution || '',
-            timestamp: new Date(c.timestamp),
-          }));
-          setGenerated([...importedCryptarithms, ...generated]);
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
   const handleDelete = (id: string) => {
     setGenerated(generated.filter(c => c.id !== id));
     if (selectedCryptarithm && selectedCryptarithm.id === id) {
       setSelectedCryptarithm(null);
     }
-  };
-
-  const handleImportWords = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        const words = text
-          .split(/[\r\n]+/)
-          .map(word => word.trim().toUpperCase())
-          .filter(word => /^[A-Z]+$/.test(word) && word.length >= 1 && word.length <= 10);
-
-        const uniqueWords = Array.from(new Set(words));
-        setCustomWords(uniqueWords);
-      };
-      reader.readAsText(file);
-    }
-    event.target.value = '';
   };
 
   const handleClearCustomWords = () => {
@@ -242,65 +240,28 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     setCustomWords(uniqueWords.slice(0, MAX_CUSTOM_WORDS));
   };
 
-  const handleAddCustomWords = () => {
-    const lines = customWordsText.split(/[\r\n]+/).filter(line => line.trim());
-    if (lines.length > MAX_CUSTOM_WORDS) {
-      return; // Don't allow more than MAX_CUSTOM_WORDS lines
-    }
-    setCustomWordsText('');
-
-    // Update custom words in real-time
-    const words = lines
-      .map(word => word.trim().toUpperCase())
-      .filter(word => /^[A-Z]+$/.test(word) && word.length >= 1 && word.length <= 10);
-
-    const uniqueWords = Array.from(new Set([...customWords, ...words]));
-    setCustomWords(uniqueWords.slice(0, MAX_CUSTOM_WORDS));
-  };
-
   return (
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
-        {/* Limit Warning */}
-        {showLimitWarning && (
-          <div className="bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] p-4 mb-6 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-[#FF3B30] flex-shrink-0" strokeWidth={1.5} />
-            <div className="flex-1">
-              <p className="text-[#1D1D1F] text-[14px] font-medium">
-                Limite atteinte ! Vous avez généré le maximum de {MAX_CRYPTARITHMS} cryptarithmes.
-              </p>
-              <p className="text-[#86868B] text-[12px] mt-1">
-                Veuillez supprimer ou exporter certains cryptarithmes avant d'en générer de nouveaux.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Generation Progress */}
-        {generated.length > 0 && (
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-4 mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[14px] font-medium text-[#1D1D1F]">Cryptarithmes générés</span>
-              <span className={`text-[14px] font-medium ${generated.length >= MAX_CRYPTARITHMS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
-                {generated.length} / {MAX_CRYPTARITHMS}
-              </span>
-            </div>
-            <div className="w-full bg-[#E5E5E5] rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all ${generated.length >= MAX_CRYPTARITHMS
-                  ? 'bg-[#FF3B30]'
-                  : generated.length >= MAX_CRYPTARITHMS * 0.8
-                    ? 'bg-[#FF9500]'
-                    : 'bg-[#0096BC]'
-                  }`}
-                style={{ width: `${(generated.length / MAX_CRYPTARITHMS) * 100}%` }}
-              ></div>
+        {/* Mobile Header - Only on mobile */}
+        {isMobile && (
+          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onOpenSidebar}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+                aria-label="Menu"
+              >
+                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Génération</h1>
+              <div className="w-10 h-10"></div>
             </div>
           </div>
         )}
 
         {/* Configuration Panel */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6">
+        <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8 mb-6"}>
           {/* Back Button - Mobile only */}
           {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
@@ -312,8 +273,49 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Operation Type */}
+            {/* Generation Mode Selection */}
             <div>
+              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                Mode de génération
+              </label>
+              <div className="space-y-2 mb-6">
+                <button
+                  onClick={() => setGenerationMode('manual')}
+                  className={`
+                    w-full flex items-start gap-3 px-4 py-3 rounded-[12px] transition-all text-left
+                    ${generationMode === 'manual'
+                      ? 'bg-[#0096BC] text-white'
+                      : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E5]'
+                    }
+                  `}
+                >
+                  <div className="flex-1">
+                    <div className="text-[14px] font-semibold mb-1">Normal</div>
+                    <div className={`text-[12px] ${generationMode === 'manual' ? 'text-white/80' : 'text-[#86868B]'}`}>
+                      Saisir les mots à la main
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setGenerationMode('doubly-true')}
+                  className={`
+                    w-full flex items-start gap-3 px-4 py-3 rounded-[12px] transition-all text-left
+                    ${generationMode === 'doubly-true'
+                      ? 'bg-[#0096BC] text-white'
+                      : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E5]'
+                    }
+                  `}
+                >
+                  <div className="flex-1">
+                    <div className="text-[14px] font-semibold mb-1">Doubly True</div>
+                    <div className={`text-[12px] ${generationMode === 'doubly-true' ? 'text-white/80' : 'text-[#86868B]'}`}>
+                      Génération par langue et bornes
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Operation Type */}
               <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
                 Type d'opération
               </label>
@@ -342,79 +344,156 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               </div>
             </div>
 
-            {/* Custom Words Text Area */}
+            {/* Custom Words Text Area (Mode Manuel) or Language Selection (Mode Doubly True) */}
             <div>
-              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
-                Mots personnalisés
-              </label>
-              <textarea
-                value={customWordsText}
-                onChange={(e) => handleCustomWordsTextChange(e.target.value)}
-                rows={6}
-                className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
-                placeholder={"SEND\nMORE\nMONEY"}
-              />
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-[#86868B] text-[12px]">
-                  Un mot par ligne (1-10 lettres, max {MAX_CUSTOM_WORDS})
-                </p>
-                <p className={`text-[12px] font-medium ${customWords.length >= MAX_CUSTOM_WORDS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
-                  {customWords.length} / {MAX_CUSTOM_WORDS}
-                </p>
-              </div>
-              {customWords.length > 0 && (
-                <button
-                  onClick={handleClearCustomWords}
-                  className="w-full py-2 bg-white hover:bg-[#FFF5F5] text-[#FF3B30] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium border border-[#FFE5E5] mt-3"
-                >
-                  <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-                  Effacer tout
-                </button>
+              {generationMode === 'manual' ? (
+                <>
+                  <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                    Mots personnalisés
+                  </label>
+                  <textarea
+                    value={customWordsText}
+                    onChange={(e) => handleCustomWordsTextChange(e.target.value)}
+                    rows={6}
+                    className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] resize-none font-mono"
+                    placeholder={"SEND\nMORE\nMONEY"}
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[#86868B] text-[12px]">
+                      Un mot par ligne (1-10 lettres, max {MAX_CUSTOM_WORDS})
+                    </p>
+                    <p className={`text-[12px] font-medium ${customWords.length >= MAX_CUSTOM_WORDS ? 'text-[#FF3B30]' : 'text-[#86868B]'}`}>
+                      {customWords.length} / {MAX_CUSTOM_WORDS}
+                    </p>
+                  </div>
+                  {customWords.length > 0 && (
+                    <button
+                      onClick={handleClearCustomWords}
+                      className="w-full py-2 bg-white hover:bg-[#FFF5F5] text-[#FF3B30] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium border border-[#FFE5E5] mt-3"
+                    >
+                      <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                      Effacer tout
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+                    Langue et bornes
+                  </label>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Langue</label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      >
+                        <option value="fr">Français</option>
+                        <option value="en">Anglais</option>
+                        <option value="de">Allemand</option>
+                        <option value="es">Espagnol</option>
+                        <option value="it">Italien</option>
+                      </select>
+                    </div>
+                    
+                    {/* Lower Bound */}
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Borne inférieure *</label>
+                      <input
+                        type="number"
+                        value={lowerBound ?? ''}
+                        onChange={(e) => setLowerBound(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="Ex: 1"
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      />
+                    </div>
+
+                    {/* Upper Bound */}
+                    <div>
+                      <label className="block text-[13px] text-[#86868B] mb-2">Borne supérieure *</label>
+                      <input
+                        type="number"
+                        value={upperBound ?? ''}
+                        onChange={(e) => setUpperBound(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="Ex: 10"
+                        className="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5E5] text-[#1D1D1F] rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px]"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-[#E8F7FB] border border-[#0096BC]/30 rounded-[12px]">
+                      <p className="text-[13px] text-[#1D1D1F] mb-2">
+                        <strong>Mode Doubly True</strong>
+                      </p>
+                      <p className="text-[12px] text-[#86868B] mb-2">
+                        Les mots seront générés automatiquement à partir des <strong>nombres écrits en lettres</strong> dans la langue sélectionnée.
+                      </p>
+                      <p className="text-[12px] text-[#86868B] italic">
+                        Exemple : avec les bornes 1 à 10 en français, les mots utilisés pour la génération seront : <strong>UN</strong>, <strong>DEUX</strong>, <strong>TROIS</strong>, ..., <strong>DIX</strong>
+                      </p>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
+          </div>
 
-            {/* Actions */}
-            <div>
-              <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
-                Actions
-              </label>
+          {/* Actions */}
+          <div className="mt-6">
+            <label className="block text-[14px] font-medium text-[#1D1D1F] mb-3">
+              Actions
+            </label>
 
-              {/* Error Message */}
-              {error && (
-                <div className="mb-3 p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-[#FF3B30] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                  <p className="text-[#FF3B30] text-[13px]">{error}</p>
-                </div>
-              )}
+            {/* Error Message */}
+            {error && (
+              <div className="mb-3 p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-[12px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-[#FF3B30] flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-[#FF3B30] text-[13px]">{error}</p>
+              </div>
+            )}
 
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="w-full py-3 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-all flex items-center justify-center gap-2 mb-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating ? (
+            <button
+              onClick={generating ? handleCancelGenerate : handleGenerate}
+              disabled={!generating && false}
+              onMouseEnter={() => generating && setIsCancelHovered(true)}
+              onMouseLeave={() => setIsCancelHovered(false)}
+              className={`w-full py-3 text-white rounded-[12px] transition-all flex items-center justify-center gap-2 mb-2 font-medium ${
+                generating && isCancelHovered
+                  ? 'bg-[#FF3B30] hover:bg-[#CC2A1F] cursor-pointer'
+                  : generating
+                  ? 'bg-[#0096BC] cursor-default'
+                  : 'bg-[#0096BC] hover:bg-[#007EA1]'
+              }`}
+            >
+              {generating ? (
+                isCancelHovered ? (
+                  <>
+                    <X className="w-5 h-5" strokeWidth={2} />
+                    Annuler la génération
+                  </>
+                ) : (
                   <>
                     <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
                     Génération en cours...
                   </>
-                ) : (
-                  <>
-                    <Wand2 className="w-5 h-5" strokeWidth={1.5} />
-                    Générer
-                  </>
-                )}
-              </button>
-
-              {generated.length > 0 && (
-                <button
-                  onClick={handleExportAll}
-                  className="w-full py-2 bg-[#F5F5F7] hover:bg-[#E5E5E5] text-[#1D1D1F] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium"
-                >
-                  <Download className="w-4 h-4" strokeWidth={1.5} />
-                  Exporter ({generated.length})
-                </button>
+                )
+              ) : (
+                <>
+                  <Wand2 className="w-5 h-5" strokeWidth={1.5} />
+                  Générer
+                </>
               )}
-            </div>
+            </button>
+
+            {generated.length > 0 && (
+              <button
+                onClick={handleExportAll}
+                className="w-full py-2 bg-[#F5F5F7] hover:bg-[#E5E5E5] text-[#1D1D1F] rounded-[12px] transition-all flex items-center justify-center gap-2 text-[14px] font-medium"
+              >
+                <Download className="w-4 h-4" strokeWidth={1.5} />
+                Exporter ({generated.length})
+              </button>
+            )}
           </div>
 
           {/* Advanced Options Section */}
@@ -433,39 +512,38 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
             {showAdvancedOptions && (
               <div className="p-4 bg-[#FAFAFA] rounded-[12px]">
-                {/* Info sur le symbole d'opération */}
-                <div className="mb-6 p-3 bg-[#E8F7FB] border border-[#0096BC]/30 rounded-[12px]">
-                  <p className="text-[13px] text-[#1D1D1F]">
-                    <strong>Opération sélectionnée :</strong>{' '}
-                    {operation === 'addition' ? 'Addition (+)' :
-                     operation === 'subtraction' ? 'Soustraction (-)' :
-                     operation === 'multiplication' ? 'Multiplication (*)' :
-                     operation === 'crossed' ? 'Opération croisée (CROSS)' :
-                     operation === 'long-multiplication' ? 'Multiplication longue (LMUL)' : operation}
-                  </p>
-                  <p className="text-[12px] text-[#86868B] mt-1">
-                    Le type d'opération est défini par votre sélection dans les paramètres de base ci-dessus
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Solution Limit */}
-                  <NumberInput
-                    label="Limite de solutions"
-                    value={solutionLimit}
-                    onChange={(val) => setSolutionLimit(val ?? 5)}
-                    min={1}
-                    max={100}
-                  />
+                  <div>
+                    <NumberInput
+                      label="Limite de solutions"
+                      value={solutionLimit}
+                      onChange={(val) => setSolutionLimit(val ?? 5)}
+                      min={1}
+                      max={API_LIMITS.maxSolutionsPerRequest}
+                    />
+                    {solutionLimit > API_LIMITS.maxSolutionsPerRequest && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ Maximum {API_LIMITS.maxSolutionsPerRequest} solutions par requête
+                      </p>
+                    )}
+                  </div>
 
                   {/* Time Limit */}
-                  <NumberInput
-                    label="Temps limite (secondes)"
-                    value={timeLimit}
-                    onChange={(val) => setTimeLimit(val ?? 60)}
-                    min={1}
-                    max={300}
-                  />
+                  <div>
+                    <NumberInput
+                      label="Temps limite (secondes)"
+                      value={timeLimit}
+                      onChange={(val) => setTimeLimit(val ?? 60)}
+                      min={1}
+                      max={API_LIMITS.maxTimeLimit}
+                    />
+                    {timeLimit > API_LIMITS.maxTimeLimit && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ Maximum {API_LIMITS.maxTimeLimit} secondes par requête
+                      </p>
+                    )}
+                  </div>
 
                   {/* Right Member Type */}
                   <SelectField
@@ -496,26 +574,6 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                     value={maxWords}
                     onChange={setMaxWords}
                     min={1}
-                    placeholder="Non défini"
-                    allowUndefined={true}
-                    helpText="Optionnel"
-                  />
-
-                  {/* Lower Bound */}
-                  <NumberInput
-                    label="Borne inférieure"
-                    value={lowerBound}
-                    onChange={setLowerBound}
-                    placeholder="Non défini"
-                    allowUndefined={true}
-                    helpText="Optionnel"
-                  />
-
-                  {/* Upper Bound */}
-                  <NumberInput
-                    label="Borne supérieure"
-                    value={upperBound}
-                    onChange={setUpperBound}
                     placeholder="Non défini"
                     allowUndefined={true}
                     helpText="Optionnel"
@@ -564,10 +622,10 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
             )}
           </div>
         </div>
-
+        
         {/* Custom Words Display */}
         {customWords.length > 0 && (
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6">
+          <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] p-6 mb-6"}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[20px] font-semibold tracking-[-0.01em]">Mots validés ({customWords.length}/{MAX_CUSTOM_WORDS})</h3>
               <button
@@ -596,7 +654,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
 
         {/* Generated List */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-8"}>
           <h2 className="text-[24px] font-bold mb-6 tracking-[-0.02em]">Cryptarithmes générés</h2>
 
           {generated.length === 0 ? (
@@ -685,7 +743,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
               </div>
               
               {/* Affichage de la solution */}
-              <div className="p-8 bg-white rounded-[12px] border border-[#E5E5E5]">
+              <div className={isMobile ? "p-4" : "p-8 bg-white rounded-[12px] border border-[#E5E5E5]"}>
                 <h3 className="text-[20px] font-semibold mb-6 tracking-[-0.01em]">Solution</h3>
                 <SolutionDisplay 
                   solution={selectedCryptarithm.solution} 
