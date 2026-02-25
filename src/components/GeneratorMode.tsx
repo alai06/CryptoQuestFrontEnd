@@ -402,7 +402,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                         Les mots seront générés automatiquement à partir des <strong>nombres écrits en lettres</strong> dans la langue sélectionnée.
                       </p>
                       <p className="text-[12px] text-[#86868B] italic">
-                        Exemple : avec les bornes 1 à 10 en français, les mots générés seront : <strong>UN</strong>, <strong>DEUX</strong>, <strong>TROIS</strong>, ..., <strong>DIX</strong>
+                        Exemple : avec les bornes 1 à 10 en français, les mots utilisés pour la génération seront : <strong>UN</strong>, <strong>DEUX</strong>, <strong>TROIS</strong>, ..., <strong>DIX</strong>
                       </p>
                     </div>
                   </div>

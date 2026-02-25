@@ -9,6 +9,7 @@ const GAME_MAX_WIDTH = 1250; // px — modifier ce nombre pour changer la largeu
 
 interface GameModeProps {
   onBack: () => void;
+  onNavigate?: (screen: 'home' | 'tutorial' | 'solver' | 'generator' | 'game' | 'progress') => void;
   isMobile?: boolean;
   onOpenSidebar?: () => void;
 }
@@ -29,7 +30,7 @@ interface SavedCryptarithm {
   timestamp: string;
 }
 
-export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: GameModeProps) {
+export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenSidebar }: GameModeProps) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [completedLevels, setCompletedLevels] = useState<Set<number>>(new Set());
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
@@ -632,7 +633,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
           
           <h1 className="text-[32px] font-bold mb-2 tracking-[-0.02em]">Mode Aventure</h1>
           <p className="text-[14px] text-[#86868B] mb-10">
-            Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <span className="font-semibold text-[#0096BC]">Génération</span> pour enrichir votre collection.
+            Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <button type="button" onClick={() => onNavigate?.('generator')} className="font-semibold text-[#0096BC] hover:underline cursor-pointer bg-transparent border-none p-0 m-0 text-[14px]">Génération</button> pour enrichir votre collection.
           </p>
 
           {/* Bouton Cryptarithme personnalisé */}
@@ -737,7 +738,7 @@ export default function GameMode({ onBack, isMobile = false, onOpenSidebar }: Ga
                   Aucun cryptarithme disponible pour le moment.
                 </p>
                 <p className="text-[#86868B] text-[14px]">
-                  Rendez-vous dans le mode <span className="font-semibold text-[#0096BC]">Génération</span> pour créer des cryptarithmes, puis revenez ici pour les jouer !
+                  Rendez-vous dans le mode <button type="button" onClick={() => onNavigate?.('generator')} className="font-semibold text-[#0096BC] hover:underline cursor-pointer bg-transparent border-none p-0 m-0 text-[14px]">Génération</button> pour créer des cryptarithmes, puis revenez ici pour les jouer !
                 </p>
               </div>
             ) : (
