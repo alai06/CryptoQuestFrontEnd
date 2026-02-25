@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Home, BookOpen, Lightbulb, Wand2, Gamepad2, Trophy } from 'lucide-react';
 import NavigationMenu from './components/NavigationMenu';
-import Mobile2048HomeScreen from './components/Mobile2048HomeScreen';
+import MobileHomeScreen from './components/MobileHomeScreen';
 import Mobile2048Sidebar from './components/Mobile2048Sidebar';
 import HomeScreen from './components/HomeScreen';
 import TutorialMode from './components/TutorialMode';
@@ -89,11 +88,10 @@ export default function App() {
       switch (currentScreen) {
         case 'home':
           return (
-            <Mobile2048HomeScreen 
+            <MobileHomeScreen 
               onNavigate={setCurrentScreen} 
               tutorialCompleted={tutorialCompleted}
               stats={userStats}
-              isLoading={isLoading}
               language={language}
               onLanguageChange={handleLanguageChange}
               onOpenSidebar={() => setIsSidebarExpanded(true)}
@@ -106,16 +104,15 @@ export default function App() {
         case 'generator':
           return <GeneratorMode onBack={() => setCurrentScreen('home')} onCryptarithmGenerated={handleCryptarithmGenerated} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         case 'game':
-          return <GameMode onBack={() => setCurrentScreen('home')} tutorialCompleted={tutorialCompleted} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
+          return <GameMode onBack={() => setCurrentScreen('home')} onNavigate={setCurrentScreen} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         case 'progress':
           return <ProgressDashboard onBack={() => setCurrentScreen('home')} isMobile={true} onOpenSidebar={() => setIsSidebarExpanded(true)} />;
         default:
           return (
-            <Mobile2048HomeScreen 
+            <MobileHomeScreen 
               onNavigate={setCurrentScreen} 
               tutorialCompleted={tutorialCompleted}
               stats={userStats}
-              isLoading={isLoading}
               language={language}
               onLanguageChange={handleLanguageChange}
               onOpenSidebar={() => setIsSidebarExpanded(true)}
@@ -135,7 +132,7 @@ export default function App() {
       case 'generator':
         return <GeneratorMode onBack={() => setCurrentScreen('home')} onCryptarithmGenerated={handleCryptarithmGenerated} />;
       case 'game':
-        return <GameMode onBack={() => setCurrentScreen('home')} tutorialCompleted={tutorialCompleted} />;
+        return <GameMode onBack={() => setCurrentScreen('home')} onNavigate={setCurrentScreen} />;
       case 'progress':
         return <ProgressDashboard onBack={() => setCurrentScreen('home')} />;
       default:

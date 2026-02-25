@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Star, Timer, HelpCircle, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
+import { ArrowLeft, Trophy, Star, Timer, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
 import DragDropBoard from './DragDropBoard';
 import { solveCryptarithm } from '../services/cryptatorApi';
 
+// ===== LARGEUR MAXIMALE DE LA ZONE DE JEU (PC) =====
+const GAME_MAX_WIDTH = 1250; // px — modifier ce nombre pour changer la largeur de la zone de jeu
+// ====================================================
+
 interface GameModeProps {
   onBack: () => void;
-  tutorialCompleted: boolean;
+  onNavigate?: (screen: 'home' | 'tutorial' | 'solver' | 'generator' | 'game' | 'progress') => void;
   isMobile?: boolean;
   onOpenSidebar?: () => void;
 }
@@ -26,13 +30,12 @@ interface SavedCryptarithm {
   timestamp: string;
 }
 
-export default function GameMode({ onBack, tutorialCompleted, isMobile = false, onOpenSidebar }: GameModeProps) {
+export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenSidebar }: GameModeProps) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [completedLevels, setCompletedLevels] = useState<Set<number>>(new Set());
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const [totalVerifications, setTotalVerifications] = useState<number>(0);
   const [score, setScore] = useState(0);
-  const [showHint, setShowHint] = useState(false);
   const [levelStars, setLevelStars] = useState<Record<number, number>>({});
   const [gameLevels, setGameLevels] = useState<Level[]>([]);
   const [completedCryptarithms, setCompletedCryptarithms] = useState<Level[]>([]);
@@ -45,6 +48,15 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
   
   // État pour la section des cryptarithmes terminés
   const [showCompletedSection, setShowCompletedSection] = useState(false);
+  
+  // État pour le modal de résumé
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryStats, setSummaryStats] = useState<{
+    stars: number;
+    time: number;
+    verifications: number;
+    points: number;
+  } | null>(null);
 
   const isEasyMode = selectedLevel?.difficulty === 'easy';
 
@@ -88,6 +100,23 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     return 0; // Déjà à 1 étoile
   };
 
+  // Noms originaux pour les cryptarithmes générés
+  const cryptarithmNames = [
+    'Énigme Divine', 'Puzzle Mystique', 'Défi Céleste', 'Casse-tête Magique',
+    'Mystère Numérique', 'Équation Cosmique', 'Rébus Astral', 'Énigme Lunaire',
+    'Puzzle Stellaire', 'Défi des Sages', 'Mystère Sacré', 'Énigme Éternelle',
+    'Puzzle d\'Hermès', 'Défi d\'Archimède', 'Mystère d\'Euclide', 'Énigme de Pythagore',
+    'Puzzle de Gauss', 'Défi de Fermat', 'Mystère de Pascal', 'Énigme de Fibonacci',
+    'Puzzle Ancestral', 'Défi Légendaire', 'Mystère Millénaire', 'Énigme Antique',
+    'Puzzle Impérial', 'Défi Royal', 'Mystère du Sphinx', 'Énigme d\'Alexandrie',
+    'Puzzle de Babel', 'Défi Olympien', 'Mystère d\'Atlantis', 'Énigme de Thulé',
+    'Puzzle Runique', 'Défi des Druides', 'Mystère Celtique', 'Énigme Nordique',
+    'Puzzle du Dragon', 'Défi du Phénix', 'Mystère du Griffon', 'Énigme de la Licorne',
+    'Puzzle Alchimique', 'Défi Hermétique', 'Mystère Ésotérique', 'Énigme Cabalistique',
+    'Puzzle Zen', 'Défi du Lotus', 'Mystère du Mandala', 'Énigme du Tao',
+    'Puzzle Stellaire', 'Défi Galactique', 'Mystère Cosmique', 'Énigme Sidérale'
+  ];
+
   // Charger les cryptarithmes générés depuis localStorage
   useEffect(() => {
     const loadGeneratedCryptarithms = () => {
@@ -125,7 +154,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
               
               return {
                 id: 1000 + index, // ID unique pour les niveaux générés
-                name: `Cryptarithme #${index + 1}`,
+                name: cryptarithmNames[index % cryptarithmNames.length],
                 equation: crypto.equation,
                 solution: solutionMap,
                 timeLimit: 300,
@@ -187,7 +216,6 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     setSelectedLevel(level);
     setTimeElapsed(0);
     setTotalVerifications(0);
-    setShowHint(false);
   };
 
   const handleVerification = () => {
@@ -220,19 +248,26 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
     setScore(newScore);
     localStorage.setItem('totalScore', newScore.toString());
 
-    setTimeout(() => {
-      setSelectedLevel(null);
-    }, 2000);
+    // Afficher le modal de résumé au lieu de revenir immédiatement
+    setSummaryStats({
+      stars,
+      time: timeElapsed,
+      verifications: totalVerifications,
+      points,
+    });
+    setShowSummaryModal(true);
+  };
+  
+  const handleCloseSummary = () => {
+    setShowSummaryModal(false);
+    setSummaryStats(null);
+    setSelectedLevel(null);
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const isLevelUnlocked = (levelId: number) => {
-    return true;
   };
 
   const handleCustomCryptarithmSubmit = async () => {
@@ -250,7 +285,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
         cryptarithm: customCryptarithm.trim(),
         solverType: 'SCALAR',
         solutionLimit: 2, // On cherche maximum 2 solutions pour vérifier qu'il y en a exactement 1
-        timeLimit: 10000,
+        timeLimit: 30,
       });
 
       if (!response.success) {
@@ -368,8 +403,9 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
 
   if (selectedLevel) {
     return (
-      <div className="min-h-screen px-8 py-16">
-        <div className="max-w-4xl mx-auto">
+      <>
+      <div className={isMobile ? "h-screen flex flex-col" : "min-h-screen px-8 py-16"}>
+        <div className={isMobile ? "flex-shrink-0 px-4 py-4" : "mx-auto"} style={!isMobile ? { maxWidth: GAME_MAX_WIDTH } : undefined}>
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button
@@ -389,76 +425,155 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   {formatTime(timeElapsed)}
                 </span>
               </div>
-
-              {/* Help Button */}
-              <button
-                onClick={() => setShowHint(!showHint)}
-                className="flex items-center gap-2 bg-white border border-[#E5E5E5] px-4 py-2 rounded-[12px] hover:border-[#0096BC] transition-colors text-[14px] font-medium"
-              >
-                <HelpCircle className="w-5 h-5 text-[#0096BC]" strokeWidth={1.5} />
-                <span>Aide</span>
-              </button>
             </div>
           </div>
 
-          {/* Game Board */}
-          <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-8">
-            <div className="mb-8">
-              <h2 className="text-[24px] font-bold mb-2 tracking-[-0.02em]">{selectedLevel.name}</h2>
-              <div className="flex items-center gap-2 mb-4">
-                <span className={`
-                  px-3 py-1 rounded-full text-[14px] font-medium
-                  ${selectedLevel.difficulty === 'easy' ? 'bg-[#D4F4DD] text-[#1D1D1F]' : ''}
-                  ${selectedLevel.difficulty === 'medium' ? 'bg-[#FFF5E5] text-[#1D1D1F]' : ''}
-                  ${selectedLevel.difficulty === 'hard' ? 'bg-[#FFE5E5] text-[#1D1D1F]' : ''}
-                `}>
-                  {selectedLevel.difficulty === 'easy' && 'Facile'}
-                  {selectedLevel.difficulty === 'medium' && 'Moyen'}
-                  {selectedLevel.difficulty === 'hard' && 'Difficile'}
-                </span>
-              </div>
-              
-              {/* Score actuel avec étoiles */}
-              <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-3 md:p-4 mb-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
-                  <div className="text-center md:text-left">
-                    <p className="text-xs md:text-[14px] font-semibold text-[#86868B] mb-1">Score actuel</p>
-                    <p className="text-xl md:text-[24px]">
-                      {calculateCurrentStars() === 4 ? '🌟⭐⭐⭐' : '⭐'.repeat(calculateCurrentStars()) + '☆'.repeat(3 - calculateCurrentStars())}
+          {/* Game Info */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <span className={`
+                px-3 py-1 rounded-full text-[14px] font-medium
+                ${selectedLevel.difficulty === 'easy' ? 'bg-[#D4F4DD] text-[#1D1D1F]' : ''}
+                ${selectedLevel.difficulty === 'medium' ? 'bg-[#FFF5E5] text-[#1D1D1F]' : ''}
+                ${selectedLevel.difficulty === 'hard' ? 'bg-[#FFE5E5] text-[#1D1D1F]' : ''}
+              `}>
+                {selectedLevel.difficulty === 'easy' && 'Facile'}
+                {selectedLevel.difficulty === 'medium' && 'Moyen'}
+                {selectedLevel.difficulty === 'hard' && 'Difficile'}
+              </span>
+            </div>
+            
+            {/* Score actuel avec étoiles */}
+            <div className="bg-gradient-to-r from-[#F5F5F7] to-white border border-[#E5E5E5] rounded-[12px] p-3 md:p-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
+                <div className="text-center md:text-left">
+                  <p className="text-xs md:text-[14px] font-semibold text-[#86868B] mb-1">Score actuel</p>
+                  <p className="text-xl md:text-[24px]">
+                    {calculateCurrentStars() === 4 ? '🌟⭐⭐⭐' : '⭐'.repeat(calculateCurrentStars()) + '☆'.repeat(3 - calculateCurrentStars())}
+                  </p>
+                </div>
+                <div className="text-center md:text-right">
+                  <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#E5E5E5] mb-2 md:mb-0">
+                    <span className="text-xs md:text-[13px] text-[#86868B]">Vérifications</span>
+                    <span className="text-sm md:text-base font-bold text-[#1D1D1F]">{totalVerifications}</span>
+                  </div>
+                  {calculateCurrentStars() === 4 && (
+                    <p className="text-xs md:text-[13px] text-[#34C759] font-medium mt-2">
+                      🌟 Parfait ! Continuez !
                     </p>
-                  </div>
-                  <div className="text-center md:text-right">
-                    <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-[#E5E5E5] mb-2 md:mb-0">
-                      <span className="text-xs md:text-[13px] text-[#86868B]">Vérifications</span>
-                      <span className="text-sm md:text-base font-bold text-[#1D1D1F]">{totalVerifications}</span>
-                    </div>
-                    {calculateCurrentStars() === 4 && (
-                      <p className="text-xs md:text-[13px] text-[#34C759] font-medium mt-2">
-                        🌟 Parfait ! Continuez !
-                      </p>
-                    )}
-                    {calculateCurrentStars() < 4 && getVerificationsUntilStarLoss() !== null && getVerificationsUntilStarLoss()! > 0 && (
-                      <p className="text-xs md:text-[13px] text-[#FF9500] font-medium mt-2">
-                        ⚠️ Encore {getVerificationsUntilStarLoss()} avant -1★
-                      </p>
-                    )}
-                  </div>
+                  )}
+                  {calculateCurrentStars() < 4 && getVerificationsUntilStarLoss() !== null && getVerificationsUntilStarLoss()! > 0 && (
+                    <p className="text-xs md:text-[13px] text-[#FF9500] font-medium mt-2">
+                      ⚠️ Encore {getVerificationsUntilStarLoss()} avant -1★
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-
-            <DragDropBoard
-              equation={selectedLevel.equation}
-              solution={selectedLevel.solution}
-              onSolved={handleLevelComplete}
-              onVerification={handleVerification}
-              showHints={showHint}
-              easyMode={isEasyMode}
-              isMobile={isMobile}
-            />
           </div>
         </div>
+
+        {/* Game Board - Takes remaining space on mobile */}
+        <div className={isMobile ? "flex-1 min-h-0 overflow-hidden" : "mx-auto bg-white rounded-[12px] border border-[#E5E5E5] p-8"} style={!isMobile ? { maxWidth: GAME_MAX_WIDTH } : undefined}>
+          <DragDropBoard
+            equation={selectedLevel.equation}
+            solution={selectedLevel.solution}
+            onSolved={handleLevelComplete}
+            onVerification={handleVerification}
+            easyMode={isEasyMode}
+            isMobile={isMobile}
+          />
+        </div>
       </div>
+
+        {/* Modal de résumé après résolution */}
+        {showSummaryModal && summaryStats && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white rounded-[20px] p-6 md:p-8 max-w-md w-full border-2 border-[#E5E5E5] shadow-2xl animate-scale-in">
+              {/* Header avec fermeture */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-[28px] font-bold tracking-[-0.02em] text-[#1D1D1F]"> Bravo !</h2>
+                <button
+                  onClick={handleCloseSummary}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center transition-colors"
+                  aria-label="Fermer"
+                >
+                  <X className="w-5 h-5 text-[#86868B]" strokeWidth={1.5} />
+                </button>
+              </div>
+
+              <p className="text-[16px] text-[#86868B] mb-8">
+                Cryptarithme résolu avec succès !
+              </p>
+
+              {/* Étoiles visuelles */}
+              <div className="mb-8 text-center">
+                <p className="text-[48px] leading-tight">
+                  {summaryStats.stars === 4 
+                    ? '🌟⭐⭐⭐' 
+                    : '⭐'.repeat(summaryStats.stars) + '☆'.repeat(3 - summaryStats.stars)}
+                </p>
+              </div>
+
+              {/* Statistiques */}
+              <div className="space-y-4 mb-8">
+                {/* Étoiles obtenues */}
+                <div className="flex items-center justify-between p-4 bg-[#F5F5F7] rounded-[12px]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-[10px] bg-[#FFD700] flex items-center justify-center">
+                      <Star className="w-5 h-5 text-white fill-white" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[15px] font-medium text-[#1D1D1F]">Étoiles</span>
+                  </div>
+                  <span className="text-[18px] font-bold text-[#1D1D1F]">{summaryStats.stars}/4</span>
+                </div>
+
+                {/* Temps écoulé */}
+                <div className="flex items-center justify-between p-4 bg-[#F5F5F7] rounded-[12px]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-[10px] bg-[#0096BC] flex items-center justify-center">
+                      <Timer className="w-5 h-5 text-white" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[15px] font-medium text-[#1D1D1F]">Temps</span>
+                  </div>
+                  <span className="text-[18px] font-bold text-[#1D1D1F]">{formatTime(summaryStats.time)}</span>
+                </div>
+
+                {/* Vérifications */}
+                <div className="flex items-center justify-between p-4 bg-[#F5F5F7] rounded-[12px]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-[10px] bg-[#00AFD7] flex items-center justify-center">
+                      <Check className="w-5 h-5 text-white" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[15px] font-medium text-[#1D1D1F]">Vérifications</span>
+                  </div>
+                  <span className="text-[18px] font-bold text-[#1D1D1F]">{summaryStats.verifications}</span>
+                </div>
+
+                {/* Score gagné */}
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#0096BC] to-[#007EA1] rounded-[12px]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-[10px] bg-white/20 flex items-center justify-center">
+                      <Trophy className="w-5 h-5 text-white" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-[15px] font-medium text-white">Points gagnés</span>
+                  </div>
+                  <span className="text-[20px] font-bold text-white">+{summaryStats.points}</span>
+                </div>
+              </div>
+
+              {/* Bouton continuer */}
+              <button
+                onClick={handleCloseSummary}
+                className="w-full px-6 py-4 rounded-[12px] bg-[#0096BC] text-white font-semibold text-[16px] hover:bg-[#007EA1] transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                Continuer
+                <ChevronRight className="w-5 h-5" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -470,20 +585,14 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
           <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
             <div className="flex items-center justify-between">
               <button
-                onClick={onBack}
-                className="w-10 h-10 rounded-xl bg-[#F5F5F7] flex items-center justify-center active:scale-95 transition-transform"
-                aria-label="Retour"
-              >
-                <ArrowLeft className="w-5 h-5 text-[#1D1D1F]" strokeWidth={2} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Mode Aventure</h1>
-              <button
                 onClick={onOpenSidebar}
                 className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
                 aria-label="Menu"
               >
                 <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
               </button>
+              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Mode Aventure</h1>
+              <div className="w-10 h-10"></div>
             </div>
           </div>
         )}
@@ -497,10 +606,22 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-10"}>
+          {/* Back Button - Mobile only */}
+          {isMobile && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-[#86868B] hover:text-[#1D1D1F] transition-colors group mb-6"
+              aria-label="Retour"
+            >
+              <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+              <span className="text-[14px] font-medium">Retour</span>
+            </button>
+          )}
+          
           <h1 className="text-[32px] font-bold mb-2 tracking-[-0.02em]">Mode Aventure</h1>
           <p className="text-[14px] text-[#86868B] mb-10">
-            Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <span className="font-semibold text-[#0096BC]">Génération</span> pour enrichir votre collection.
+            Résolvez un maximum de cryptarithmes pour gagner de l'XP et débloquer des titres ! Générez-en de nouveaux dans l'onglet <button type="button" onClick={() => onNavigate?.('generator')} className="font-semibold text-[#0096BC] hover:underline cursor-pointer bg-transparent border-none p-0 m-0 text-[14px]">Génération</button> pour enrichir votre collection.
           </p>
 
           {/* Bouton Cryptarithme personnalisé */}
@@ -524,10 +645,10 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
 
           {/* Section Cryptarithmes terminés (dépliable) */}
           {completedCryptarithms.length > 0 && (
-            <div className="bg-white rounded-[12px] border border-[#E5E5E5] mb-6">
+            <div className={isMobile ? "mb-6" : "bg-white rounded-[12px] border border-[#E5E5E5] mb-6"}>
               <button
                 onClick={() => setShowCompletedSection(!showCompletedSection)}
-                className="w-full p-6 rounded-[12px] transition-all text-left hover:bg-[#F5F5F7]"
+                className={isMobile ? "w-full p-4 rounded-[12px] transition-all text-left" : "w-full p-6 rounded-[12px] transition-all text-left hover:bg-[#F5F5F7]"}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -561,8 +682,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                             <Check className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-[#1D1D1F] font-semibold text-[13px] md:text-[14px] truncate">{crypto.name}</h3>
-                            <p className="text-[#86868B] text-[11px] md:text-[13px] font-mono truncate">{crypto.equation}</p>
+                            <p className="text-[#1D1D1F] text-[13px] md:text-[14px] font-mono truncate font-semibold">{crypto.equation}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
@@ -606,12 +726,12 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                   Aucun cryptarithme disponible pour le moment.
                 </p>
                 <p className="text-[#86868B] text-[14px]">
-                  Rendez-vous dans le mode <span className="font-semibold text-[#0096BC]">Génération</span> pour créer des cryptarithmes, puis revenez ici pour les jouer !
+                  Rendez-vous dans le mode <button type="button" onClick={() => onNavigate?.('generator')} className="font-semibold text-[#0096BC] hover:underline cursor-pointer bg-transparent border-none p-0 m-0 text-[14px]">Génération</button> pour créer des cryptarithmes, puis revenez ici pour les jouer !
                 </p>
               </div>
             ) : (
               gameLevels.filter(level => !completedCryptarithms.some(c => c.id === level.id)).map((level, index) => {
-              const isUnlocked = isLevelUnlocked(level.id);
+              const isUnlocked = true;
               const isCompleted = completedLevels.has(level.id);
               const stars = levelStars[level.id] || 0;
 
@@ -638,8 +758,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[#1D1D1F] mb-0.5 md:mb-1 font-semibold text-[14px] md:text-[16px] tracking-[-0.01em] truncate">{level.name}</h3>
-                        <p className="text-[#86868B] text-[12px] md:text-[14px] font-mono truncate">{level.equation}</p>
+                        <p className="text-[#1D1D1F] text-[14px] md:text-[16px] font-mono truncate font-semibold">{level.equation}</p>
                       </div>
                     </div>
 
@@ -666,7 +785,7 @@ export default function GameMode({ onBack, tutorialCompleted, isMobile = false, 
                         className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group flex-shrink-0"
                         aria-label="Supprimer ce cryptarithme"
                       >
-                        <X className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={2} />
+                        <X className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={1.5} />
                       </button>
 
                       {isUnlocked && <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] flex-shrink-0" strokeWidth={1.5} />}

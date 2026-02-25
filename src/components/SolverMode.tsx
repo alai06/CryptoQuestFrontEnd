@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { ArrowLeft, Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
-import { solveCryptarithm as solveCryptarithmAPI } from '../services/cryptatorApi';
+import { useState, useRef } from 'react';
+import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { solveCryptarithm as solveCryptarithmAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
 
@@ -32,9 +32,9 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
     'ABC + DEF = GHI && JKL + MNO = PQR',
   ],
   'long-multiplication': [
-    'AB * CD && EFG + HIJ = KLMN',
-    'ABC * DE && FGHI + JKLM = NOPQR',
-    'AB * CD && EF + GHI = JKLM',
+    "CUT * T = BUST && CUT * I = TNNT && TNNT * '10' + BUST = TENET && TENET = CUT * IT",
+    "RED * S = ARCS && RED * A = RED && RED * '10' + ARCS = CDTS && CDTS = RED * AS",
+    "SEE * SO = MIMEO && MIMEO = EMOO + '10'*MESS && SEE * O = EMOO && SEE * S = MESS",
   ],
   generated: [],
 };
@@ -45,6 +45,8 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   const [solutions, setSolutions] = useState<Array<Record<string, number>>>([]);
   const [currentSolutionIndex, setCurrentSolutionIndex] = useState(0);
   const [error, setError] = useState('');
+  const [isCancelHovered, setIsCancelHovered] = useState(false);
+  const currentTaskIdRef = useRef<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<OperationType>('addition');
   
   // Advanced API options
@@ -56,6 +58,8 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   const [hornerScheme, setHornerScheme] = useState<boolean>(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
+  const API_LIMITS = getApiLimits();
+
   const handleSolve = async () => {
     if (!equation.trim()) {
       setError('Veuillez entrer une équation');
@@ -66,10 +70,15 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     setError('');
     setSolutions([]);
     setCurrentSolutionIndex(0);
+    setIsCancelHovered(false);
+
+    const taskId = crypto.randomUUID();
+    currentTaskIdRef.current = taskId;
 
     try {
       const response = await solveCryptarithmAPI({
         cryptarithm: equation,
+        taskId: taskId,
         solverType: solverType,
         solutionLimit: solutionLimit,
         timeLimit: timeLimit,
@@ -113,10 +122,29 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
         setError(response.error || 'Aucune solution trouvée pour ce cryptarithme');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la résolution');
+      const errMsg = err instanceof Error ? err.message : 'Erreur lors de la résolution';
+      if (!errMsg.includes('cancelled') && !errMsg.includes('annul')) {
+        setError(errMsg);
+      }
     } finally {
       setSolving(false);
+      setIsCancelHovered(false);
+      currentTaskIdRef.current = null;
     }
+  };
+
+  const handleCancelSolve = async () => {
+    const taskId = currentTaskIdRef.current;
+    if (taskId) {
+      currentTaskIdRef.current = null;
+      try {
+        await cancelTask(taskId);
+      } catch {
+        // ignore
+      }
+    }
+    setSolving(false);
+    setIsCancelHovered(false);
   };
 
   const handleExport = () => {
@@ -247,8 +275,25 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
   return (
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
+        {/* Mobile Header - Only on mobile */}
+        {isMobile && (
+          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onOpenSidebar}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+                aria-label="Menu"
+              >
+                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Résolution</h1>
+              <div className="w-10 h-10"></div>
+            </div>
+          </div>
+        )}
+
         {/* Main Container */}
-        <div className="bg-white rounded-[12px] border border-[#E5E5E5] p-10">
+        <div className={isMobile ? "" : "bg-white rounded-[12px] border border-[#E5E5E5] p-10"}>
           {/* Back Button - Mobile only */}
           {isMobile && <BackButtonWithProgress onBack={onBack} />}
 
@@ -363,24 +408,38 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                 />
 
                 {/* Solution Limit */}
-                <NumberInput
-                  label="Limite de solutions"
-                  value={solutionLimit}
-                  onChange={(val) => setSolutionLimit(val ?? 0)}
-                  min={0}
-                  max={1000}
-                  helpText="0 = toutes les solutions"
-                />
+                <div>
+                  <NumberInput
+                    label="Limite de solutions"
+                    value={solutionLimit}
+                    onChange={(val) => setSolutionLimit(val ?? 0)}
+                    min={0}
+                    max={API_LIMITS.maxSolutionsPerRequest}
+                    helpText={`0 = toutes (max ${API_LIMITS.maxSolutionsPerRequest})`}
+                  />
+                  {solutionLimit > API_LIMITS.maxSolutionsPerRequest && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Maximum {API_LIMITS.maxSolutionsPerRequest} solutions par requête
+                    </p>
+                  )}
+                </div>
 
                 {/* Time Limit */}
-                <NumberInput
-                  label="Temps limite (secondes)"
-                  value={timeLimit}
-                  onChange={(val) => setTimeLimit(val ?? 0)}
-                  min={0}
-                  max={300}
-                  helpText="0 = pas de limite"
-                />
+                <div>
+                  <NumberInput
+                    label="Temps limite (secondes)"
+                    value={timeLimit}
+                    onChange={(val) => setTimeLimit(val ?? 0)}
+                    min={0}
+                    max={API_LIMITS.maxTimeLimit}
+                    helpText={`0 = pas de limite (max ${API_LIMITS.maxTimeLimit}s)`}
+                  />
+                  {timeLimit > API_LIMITS.maxTimeLimit && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Maximum {API_LIMITS.maxTimeLimit} secondes par requête
+                    </p>
+                  )}
+                </div>
 
                 {/* Arithmetic Base */}
                 <NumberInput
@@ -413,15 +472,30 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
 
           {/* Solve Button */}
           <button
-            onClick={handleSolve}
-            disabled={solving || !equation.trim()}
-            className="w-full py-4 bg-[#0096BC] text-white rounded-[12px] hover:bg-[#007EA1] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-6 text-[14px] font-medium"
+            onClick={solving ? handleCancelSolve : handleSolve}
+            disabled={!solving && !equation.trim()}
+            onMouseEnter={() => solving && setIsCancelHovered(true)}
+            onMouseLeave={() => setIsCancelHovered(false)}
+            className={`w-full py-4 text-white rounded-[12px] transition-colors flex items-center justify-center gap-3 mb-6 text-[14px] font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+              solving && isCancelHovered
+                ? 'bg-[#FF3B30] hover:bg-[#CC2A1F] cursor-pointer'
+                : solving
+                ? 'bg-[#0096BC] cursor-default'
+                : 'bg-[#0096BC] hover:bg-[#007EA1]'
+            }`}
           >
             {solving ? (
-              <>
-                <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
-                <span>Résolution en cours...</span>
-              </>
+              isCancelHovered ? (
+                <>
+                  <X className="w-5 h-5" strokeWidth={2} />
+                  <span>Annuler la résolution</span>
+                </>
+              ) : (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                  <span>Résolution en cours...</span>
+                </>
+              )
             ) : (
               <>
                 <Play className="w-5 h-5" strokeWidth={1.5} />
