@@ -40,6 +40,15 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   // Generation mode
   const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
   const [language, setLanguage] = useState<string>('fr');
+
+  // Map language code → country code for doubly-true WordArray
+  const langToCountry: Record<string, string> = {
+    fr: 'FR',
+    en: 'US',
+    de: 'DE',
+    es: 'ES',
+    it: 'IT',
+  };
   
   // Advanced API options
   const [solutionLimit, setSolutionLimit] = useState<number>(5);
@@ -168,6 +177,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         threads: threads,
         allowLeadingZeros: allowLeadingZeros,
         crossGridSize: crossGridSize,
+        countryCode: generationMode === 'doubly-true' ? langToCountry[language] : undefined,
         langCode: generationMode === 'doubly-true' ? language : undefined,
       }, controller.signal);
 
@@ -178,8 +188,8 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         // Add all generated cryptarithms to the list
         const newCryptarithms: GeneratedCryptarithm[] = response.cryptarithms.map(crypto => ({
           id: Date.now().toString() + Math.random(),
-          equation: crypto.cryptarithm,
-          solution: crypto.solution,
+          equation: crypto.cryptarithm.toUpperCase(),
+          solution: crypto.solution.toUpperCase(),
           timestamp: new Date(),
         }));
 
