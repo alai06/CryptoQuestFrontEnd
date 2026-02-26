@@ -1,17 +1,3 @@
-interface SolverResult {
-  solution: Record<string, number> | null;
-  solutions: Array<Record<string, number>>;
-  steps: string[];
-}
-
-// Cache for solver results to optimize performance
-interface GameState {
-  equation: string;
-  assignments: Record<string, number>;
-  lastSolved: number;
-  cachedConstraints?: LetterConstraints;
-}
-
 interface LetterConstraints {
   letter: string;
   possibleValues: number[];
@@ -23,6 +9,14 @@ interface DigitConstraints {
   digit: number;
   possibleLetters: string[];
   impossibleLetters: string[];
+}
+
+// Cache for game state
+interface GameState {
+  equation: string;
+  assignments: Record<string, number>;
+  lastSolved: number;
+  cachedConstraints?: LetterConstraints;
 }
 
 let gameStateCache: GameState | null = null;
@@ -41,11 +35,6 @@ export function getGameState(equation: string, assignments: Record<string, numbe
   
   gameStateCache = newState;
   return newState;
-}
-
-// Clear game state cache
-export function clearGameStateCache() {
-  gameStateCache = null;
 }
 
 // Get constraints for a specific letter
@@ -131,22 +120,6 @@ export function getDigitConstraints(equation: string, digit: number, currentAssi
   };
 }
 
-// Get hint by excluding impossible values for a letter
-export function getHintForLetter(equation: string, letter: string, currentAssignments: Record<string, number>): string {
-  const constraints = getLetterConstraints(equation, letter, currentAssignments);
-  
-  if (constraints.impossibleValues.length === 0) {
-    return `${letter} peut être n'importe quel chiffre de 0 à 9`;
-  }
-  
-  const hint = `${letter} ne peut PAS être : ${constraints.impossibleValues.join(', ')}`;
-  if (constraints.reason) {
-    return `${hint} (${constraints.reason})`;
-  }
-  
-  return hint;
-}
-
 // Check if an assignment is valid in easy mode (block obviously wrong moves)
 export function isValidEasyModeAssignment(
   equation: string,
@@ -164,115 +137,6 @@ export function isValidEasyModeAssignment(
   }
   
   return { valid: true };
-}
-
-export function solveCryptarithm(equation: string): SolverResult {
-  const steps: string[] = [];
-  
-  // Parse the equation
-  const parts = equation.replace(/\s/g, '').split(/[+=]/);
-  if (parts.length < 3) {
-    return { solution: null, solutions: [], steps: ['Équation invalide'] };
-  }
-
-  const operands = parts.slice(0, -1);
-  const result = parts[parts.length - 1];
-
-  // Get all unique letters
-  const letters = Array.from(new Set(equation.match(/[A-Z]/g) || []));
-  
-  steps.push(`Lettres identifiées : ${letters.join(', ')}`);
-  steps.push(`Nombre de lettres uniques : ${letters.length}`);
-
-  if (letters.length > 10) {
-    return { solution: null, solutions: [], steps: [...steps, 'Trop de lettres uniques (max 10)'] };
-  }
-
-  // Get first letters (cannot be 0)
-  const firstLetters = new Set<string>();
-  [...operands, result].forEach(word => {
-    if (word.length > 0) {
-      firstLetters.add(word[0]);
-    }
-  });
-
-  steps.push(`Lettres ne pouvant être 0 : ${Array.from(firstLetters).join(', ')}`);
-
-  // Try to solve with backtracking
-  const assignment: Record<string, number> = {};
-  const usedDigits = new Set<number>();
-
-  function evaluate(word: string): number {
-    let value = 0;
-    for (const char of word) {
-      if (assignment[char] === undefined) return -1;
-      value = value * 10 + assignment[char];
-    }
-    return value;
-  }
-
-  function isValid(): boolean {
-    // Check if all operands can be evaluated
-    for (const operand of operands) {
-      if (evaluate(operand) === -1) return true; // Not all assigned yet
-    }
-    
-    if (evaluate(result) === -1) return true; // Result not assigned yet
-
-    // Calculate sum
-    const sum = operands.reduce((acc, operand) => acc + evaluate(operand), 0);
-    const resultValue = evaluate(result);
-
-    return sum === resultValue;
-  }
-
-  function solveAll(index: number): void {
-    if (index === letters.length) {
-      if (isValid()) {
-        // Store a copy of the current assignment
-        allSolutions.push({ ...assignment });
-      }
-      return;
-    }
-
-    const letter = letters[index];
-    const startDigit = firstLetters.has(letter) ? 1 : 0;
-
-    for (let digit = startDigit; digit <= 9; digit++) {
-      if (!usedDigits.has(digit)) {
-        assignment[letter] = digit;
-        usedDigits.add(digit);
-
-        solveAll(index + 1);
-
-        delete assignment[letter];
-        usedDigits.delete(digit);
-      }
-    }
-  }
-
-  steps.push('Début de la résolution par backtracking...');
-  
-  // Collect all solutions
-  const allSolutions: Array<Record<string, number>> = [];
-
-  solveAll(0);
-  
-  if (allSolutions.length > 0) {
-    steps.push(`${allSolutions.length} solution(s) trouvée(s) !`);
-    steps.push(`Vérification première solution : ${operands.map(op => {
-      let val = 0;
-      for (const c of op) val = val * 10 + allSolutions[0][c];
-      return val;
-    }).join(' + ')} = ${(() => {
-      let val = 0;
-      for (const c of result) val = val * 10 + allSolutions[0][c];
-      return val;
-    })()}`);
-    return { solution: allSolutions[0], solutions: allSolutions, steps };
-  }
-
-  return { solution: null, solutions: [], steps: [...steps, 'Aucune solution trouvée'] };
 }
 
 /**
@@ -345,97 +209,4 @@ export function validateSolution(equation: string, assignments: Record<string, s
   }
 
   return true;
-}
-
-export function generateCryptarithm(
-  operation: 'addition' | 'subtraction' | 'multiplication' | 'crossed' | 'long-multiplication',
-  numTerms: number,
-  difficulty: 'easy' | 'medium' | 'hard',
-  customWords?: string[]
-): string {
-  // Word pools for different difficulties
-  const easyWords = ['A', 'AB', 'ABC', 'CAT', 'DOG', 'FOX', 'BAT'];
-  const mediumWords = ['TWO', 'SIX', 'TEN', 'ONE', 'FIVE', 'NINE', 'FOUR', 'SEVEN'];
-  const hardWords = ['SEND', 'MORE', 'MONEY', 'HAPPY', 'GREAT', 'WORLD'];
-
-  let wordPool: string[];
-  
-  // Use custom words if provided, otherwise use default pools
-  if (customWords && customWords.length > 0) {
-    wordPool = customWords;
-  } else {
-    switch (difficulty) {
-      case 'easy':
-        wordPool = easyWords;
-        break;
-      case 'medium':
-        wordPool = mediumWords;
-        break;
-      case 'hard':
-        wordPool = hardWords;
-        break;
-    }
-  }
-
-  // Handle crossed cryptarithm (grid format)
-  if (operation === 'crossed') {
-    // Generate a 3x3 grid where each row and column forms an equation
-    // Format: "A + B = C | D + E = F | G + H = I"
-    // This means:
-    // Row 1: A + B = C
-    // Row 2: D + E = F  
-    // Row 3: G + H = I
-    // Col 1: A + D = G
-    // Col 2: B + E = H
-    // Col 3: C + F = I
-    
-    if (difficulty === 'easy') {
-      return 'A + B = C | D + E = F | G + H = I';
-    } else if (difficulty === 'medium') {
-      return 'A + B = C | D + E = F | G + H = I';
-    } else {
-      return 'AB + CD = EF | GH + IJ = KL | MN + OP = QR';
-    }
-  }
-
-  // Handle long multiplication with detailed steps
-  if (operation === 'long-multiplication') {
-    // Generate format showing partial products
-    // Example:   ABC
-    //          ×  DE
-    //          ----
-    //          FGHI  (ABC × E)
-    //        JKLM   (ABC × D)
-    //        ------
-    //        NOPQR
-    
-    const multiplicand = difficulty === 'easy' ? 'AB' : difficulty === 'medium' ? 'ABC' : 'ABC';
-    const multiplier = difficulty === 'easy' ? 'C' : difficulty === 'medium' ? 'DE' : 'DE';
-    
-    if (difficulty === 'easy') {
-      return `${multiplicand} × ${multiplier} = FGH`;
-    } else {
-      const partial1 = difficulty === 'medium' ? 'FGHI' : 'FGHI';
-      const partial2 = difficulty === 'medium' ? 'JKLM' : 'JKLM';
-      const finalResult = difficulty === 'medium' ? 'NOPQR' : 'NOPQRS';
-      return `${multiplicand} × ${multiplier} | ${partial1} + ${partial2} = ${finalResult}`;
-    }
-  }
-
-  // Original logic for other operations
-  // Generate random cryptarithm
-  const selectedWords: string[] = [];
-  for (let i = 0; i < numTerms; i++) {
-    const word = wordPool[Math.floor(Math.random() * wordPool.length)];
-    selectedWords.push(word);
-  }
-
-  // Result word should be longer for addition
-  const resultWord = operation === 'addition' 
-    ? hardWords[Math.floor(Math.random() * hardWords.length)]
-    : mediumWords[Math.floor(Math.random() * mediumWords.length)];
-
-  const operatorSymbol = operation === 'addition' ? '+' : operation === 'subtraction' ? '-' : '×';
-  
-  return `${selectedWords.join(` ${operatorSymbol} `)} = ${resultWord}`;
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import NavigationMenu from './components/NavigationMenu';
 import MobileHomeScreen from './components/MobileHomeScreen';
-import Mobile2048Sidebar from './components/Mobile2048Sidebar';
+import MobileSidebar from './components/MobileSidebar';
 import HomeScreen from './components/HomeScreen';
 import TutorialMode from './components/TutorialMode';
 import SolverMode from './components/SolverMode';
@@ -9,8 +9,8 @@ import GeneratorMode from './components/GeneratorMode';
 import GameMode from './components/GameMode';
 import ProgressDashboard from './components/ProgressDashboard';
 import { Language } from './utils/translations';
-
-type Screen = 'home' | 'tutorial' | 'solver' | 'generator' | 'game' | 'progress';
+import type { Screen } from './types';
+import { safeParseLocalStorage } from './utils/storageUtils';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -18,7 +18,6 @@ export default function App() {
   const [generatedCryptarithms, setGeneratedCryptarithms] = useState<Array<{equation: string, solution: Record<string, string>}>>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [userStats, setUserStats] = useState({ levels: 0, stars: 0, badges: 0 });
-  const [isLoading, setIsLoading] = useState(true);
   const [language, setLanguage] = useState<Language>('fr');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
@@ -34,33 +33,20 @@ export default function App() {
     setTutorialCompleted(completed);
     
     // Load generated cryptarithms from localStorage
-    const saved = localStorage.getItem('generatedCryptarithms');
-    if (saved) {
-      try {
-        setGeneratedCryptarithms(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to load generated cryptarithms', e);
-      }
-    }
+    setGeneratedCryptarithms(
+      safeParseLocalStorage<Array<{equation: string, solution: Record<string, string>}>>('generatedCryptarithms', [])
+    );
 
     // Load user stats from localStorage
-    const savedStats = localStorage.getItem('userStats');
-    if (savedStats) {
-      try {
-        setUserStats(JSON.parse(savedStats));
-      } catch (e) {
-        console.error('Failed to load user stats', e);
-      }
-    }
+    setUserStats(
+      safeParseLocalStorage('userStats', { levels: 0, stars: 0, badges: 0 })
+    );
 
     // Load language preference from localStorage
     const savedLanguage = localStorage.getItem('language') as Language;
     if (savedLanguage && (savedLanguage === 'fr' || savedLanguage === 'en')) {
       setLanguage(savedLanguage);
     }
-    
-    // Simulate loading delay
-    setTimeout(() => setIsLoading(false), 500);
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
@@ -142,15 +128,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FBFBFD]">
-      {isLoading ? (
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-[#0096BC]"></div>
-        </div>
-      ) : (
-        <>
+      <>
           {/* Sidebar - Always visible on mobile when expanded */}
           {isMobile && (
-            <Mobile2048Sidebar 
+            <MobileSidebar 
               currentScreen={currentScreen} 
               onNavigate={setCurrentScreen}
               tutorialCompleted={tutorialCompleted}
@@ -175,7 +156,6 @@ export default function App() {
             {renderScreen()}
           </div>
         </>
-      )}
     </div>
   );
 }

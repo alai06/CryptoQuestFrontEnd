@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, CheckCircle, Menu } from 'lucide-react';
+import { Trophy, Star, Target, Award, Medal, Crown, Zap, Flame, Sparkles, TrendingUp, CheckCircle } from 'lucide-react';
+import MobilePageHeader from './MobilePageHeader';
+import { safeParseLocalStorage, calculateLevelFromXP, calculateTotalXPFromStars } from '../utils/storageUtils';
 import BackButtonWithProgress from './BackButtonWithProgress';
 
 interface ProgressDashboardProps {
@@ -12,33 +14,11 @@ interface Achievement {
   id: string;
   name: string;
   description: string;
-  icon: any;
+  icon: React.ComponentType<Record<string, unknown>>;
   unlocked: boolean;
   requirement: string;
   category: 'completion' | 'performance' | 'speed' | 'collection';
 }
-
-// Calcul de l'XP requis pour chaque niveau (progression exponentielle)
-const calculateXPForLevel = (level: number): number => {
-  return Math.floor(100 * Math.pow(1.5, level - 1));
-};
-
-// Calcul du niveau et de l'XP actuelle basé sur le total XP
-const calculateLevelFromXP = (totalXP: number): { level: number; currentLevelXP: number; nextLevelXP: number; progress: number } => {
-  let level = 1;
-  let xpUsed = 0;
-  
-  while (true) {
-    const xpForNextLevel = calculateXPForLevel(level + 1);
-    if (xpUsed + xpForNextLevel > totalXP) {
-      const currentLevelXP = totalXP - xpUsed;
-      const progress = (currentLevelXP / xpForNextLevel) * 100;
-      return { level, currentLevelXP, nextLevelXP: xpForNextLevel, progress };
-    }
-    xpUsed += xpForNextLevel;
-    level++;
-  }
-};
 
 export default function ProgressDashboard({ onBack, isMobile = false, onOpenSidebar }: ProgressDashboardProps) {
   const [totalXP, setTotalXP] = useState<number>(0);
@@ -49,46 +29,25 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
 
   useEffect(() => {
     // Charger les cryptarithmes complétés
-    const completed = localStorage.getItem('completedCryptarithms');
-    if (completed) {
-      const cryptos = JSON.parse(completed);
-      setCompletedCryptos(cryptos.length);
-    }
+    const cryptos = safeParseLocalStorage<unknown[]>('completedCryptarithms', []);
+    setCompletedCryptos(cryptos.length);
 
     // Charger les étoiles et calculer l'XP
-    const stars = localStorage.getItem('levelStars');
-    if (stars) {
-      const starsObj = JSON.parse(stars);
-      setLevelStars(starsObj);
-      
-      // Calculer XP total : 1★=10, 2★=25, 3★=50, 4★=100
-      let xp = 0;
-      Object.values(starsObj).forEach((starCount: any) => {
-        if (starCount === 1) xp += 10;
-        else if (starCount === 2) xp += 25;
-        else if (starCount === 3) xp += 50;
-        else if (starCount === 4) xp += 100;
-      });
-      setTotalXP(xp);
-    }
+    const starsObj = safeParseLocalStorage<Record<number, number>>('levelStars', {});
+    setLevelStars(starsObj);
+    setTotalXP(calculateTotalXPFromStars(starsObj));
 
-    const score = localStorage.getItem('totalScore');
-    if (score) {
-      setTotalScore(Number(score));
-    }
+    setTotalScore(Number(localStorage.getItem('totalScore') ?? 0));
 
     // Compter les cryptarithmes générés
-    const generated = localStorage.getItem('generatedCryptarithms');
-    if (generated) {
-      setGeneratedCount(JSON.parse(generated).length);
-    }
+    setGeneratedCount(safeParseLocalStorage<unknown[]>('generatedCryptarithms', []).length);
   }, []);
 
   const { level, currentLevelXP, nextLevelXP, progress } = calculateLevelFromXP(totalXP);
   
   // Statistiques des étoiles
   const starCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
-  Object.values(levelStars).forEach((stars: any) => {
+  Object.values(levelStars).forEach((stars: number) => {
     if (stars >= 1 && stars <= 4) {
       starCounts[stars as keyof typeof starCounts]++;
     }
@@ -211,20 +170,8 @@ export default function ProgressDashboard({ onBack, isMobile = false, onOpenSide
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
         {/* Mobile Header - Only on mobile */}
-        {isMobile && (
-          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onOpenSidebar}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
-                aria-label="Menu"
-              >
-                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Progression</h1>
-              <div className="w-10 h-10"></div>
-            </div>
-          </div>
+        {isMobile && onOpenSidebar && (
+          <MobilePageHeader title="Progression" onOpenSidebar={onOpenSidebar} />
         )}
 
         {/* Back Button - Mobile only */}

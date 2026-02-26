@@ -1,6 +1,4 @@
 import { BookOpen, Lightbulb, Wand2, Gamepad2, Trophy, Menu } from 'lucide-react';
-import { useState } from 'react';
-import LanguageSelector from './LanguageSelector';
 import { Language, getTranslations } from '../utils/translations';
 
 interface MobileHomeScreenProps {
@@ -21,12 +19,9 @@ export default function MobileHomeScreen({
   tutorialCompleted,
   stats = { levels: 0, stars: 0, badges: 0 },
   language,
-  onLanguageChange,
+  onLanguageChange: _onLanguageChange,
   onOpenSidebar
 }: MobileHomeScreenProps) {
-  const [showHelp, setShowHelp] = useState(false);
-  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
-
   const t = getTranslations(language);
 
   const modes = [
@@ -196,45 +191,6 @@ export default function MobileHomeScreen({
           </div>
         </button>
       </div>
-
-      {/* Help Overlay - 2048 style */}
-      {showHelp && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-5"
-          onClick={() => setShowHelp(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl p-8 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-[24px] font-black mb-3 text-[#1D1D1F]">
-              {t.helpTitle}
-            </h3>
-            <p className="text-[15px] text-[#86868B] leading-relaxed mb-4">
-              {t.helpContent}
-            </p>
-            <div className="bg-[#FBFBFD] rounded-2xl p-4 mb-6">
-              <p className="text-[13px] text-[#0096BC] font-bold text-center">
-                {t.helpExample}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowHelp(false)}
-              className="w-full bg-gradient-to-r from-[#00AFD7] to-[#007EA1] text-white py-4 rounded-2xl font-black text-[17px] active:scale-[0.98] transition-transform"
-            >
-              {t.helpButton}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Language Selector Modal */}
-      <LanguageSelector
-        currentLanguage={language}
-        onLanguageChange={onLanguageChange}
-        isOpen={showLanguageSelector}
-        onClose={() => setShowLanguageSelector(false)}
-      />
     </div>
   );
 }

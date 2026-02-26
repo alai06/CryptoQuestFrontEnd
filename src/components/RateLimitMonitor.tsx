@@ -19,6 +19,7 @@ export default function RateLimitMonitor({ className = '', compact = false }: Ra
     waitTime: 0,
   });
   const [showDetails, setShowDetails] = useState(false);
+  const [pendingReset, setPendingReset] = useState(false);
 
   useEffect(() => {
     // Mettre à jour les stats régulièrement
@@ -33,11 +34,18 @@ export default function RateLimitMonitor({ className = '', compact = false }: Ra
   }, []);
 
   const handleReset = () => {
-    if (confirm('Êtes-vous sûr de vouloir réinitialiser les limites ? Cela effacera également le cache.')) {
-      resetRateLimiter();
-      setStats(getRateLimitStats());
+    if (!pendingReset) {
+      // Premier clic : demande de confirmation inline
+      setPendingReset(true);
+      return;
     }
+    // Deuxième clic : exécution confirmée
+    setPendingReset(false);
+    resetRateLimiter();
+    setStats(getRateLimitStats());
   };
+
+  const handleCancelReset = () => setPendingReset(false);
 
   const handleClearCache = () => {
     clearApiCache();
@@ -126,12 +134,20 @@ export default function RateLimitMonitor({ className = '', compact = false }: Ra
                 </button>
                 <button
                   onClick={handleReset}
-                  className="flex-1 px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
-                  title="Réinitialiser"
+                  className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${pendingReset ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                  title={pendingReset ? 'Cliquez encore pour confirmer' : 'Réinitialiser'}
                 >
                   <Trash2 className="w-3 h-3 inline mr-1" />
-                  Reset
+                  {pendingReset ? 'Confirmer ?' : 'Reset'}
                 </button>
+                {pendingReset && (
+                  <button
+                    onClick={handleCancelReset}
+                    className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -226,14 +242,32 @@ export default function RateLimitMonitor({ className = '', compact = false }: Ra
         </div>
 
         {/* Actions */}
-        <div className="pt-4 border-t">
-          <button
-            onClick={handleReset}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <Trash2 className="w-4 h-4" />
-            Réinitialiser les compteurs
-          </button>
+        <div className="pt-4 border-t space-y-2">
+          {pendingReset ? (
+            <div className="flex gap-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Confirmer la réinitialisation
+              </button>
+              <button
+                onClick={handleCancelReset}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleReset}
+              className="w-full px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Réinitialiser les compteurs
+            </button>
+          )}
         </div>
 
         {/* Informations */}

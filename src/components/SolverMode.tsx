@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { Play, Loader, Download, Plus, X, Grid3x3, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import MobilePageHeader from './MobilePageHeader';
 import { solveCryptarithm as solveCryptarithmAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
+import { parseSolutionAssignment } from '../utils/storageUtils';
 import BackButtonWithProgress from './BackButtonWithProgress';
 import { SelectField, NumberInput, CheckboxField } from './FormComponents';
 import VerticalCryptarithm from './VerticalCryptarithm';
@@ -19,19 +21,17 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
   addition: [
     'SEND + MORE = MONEY',
     'TWO + TWO = FOUR',
-    'SO + MANY = HAPPY',
+    'AZURE + GRAY = GREEN',
     'ABC + DEF = GHIJ',
     'CAT + DOG = PETS',
   ],
   multiplication: [
     'AB * C = DEF',
-    'TWO * TWO = FOUR',
+    'EUROPA * IO = MERCURY',
     'AB * CD = EFGH',
   ],
   crossed: [
-    'A + B = C && D + E = F && G + H = I',
-    'AB + CD = EF && GH + IJ = KL && MN + OP = QR',
-    'ABC + DEF = GHI && JKL + MNO = PQR',
+    'AN + ODE = TUT && TA + TEL = SUT && DOL + LAD = NUE && AN + TA = DOL && ODE + TEL = LAD && TUT + SUT = NUE',
   ],
   'long-multiplication': [
     "CUT * T = BUST && CUT * I = TNNT && TNNT * '10' + BUST = TENET && TENET = CUT * IT",
@@ -41,9 +41,58 @@ const cryptarithmExamples: Record<OperationType, string[]> = {
   generated: [],
 };
 
+/**
+ * Converts a long-multiplication equation in API &&-format
+ * to the format expected by VerticalCryptarithm:
+ * "MULTIPLICAND × MULTIPLIER | partial1 + partial2 = RESULT"
+ */
+function convertLongMultiplicationForDisplay(equation: string): string {
+  const parts = equation.split('&&').map(p => p.trim());
+  const word = '[A-Za-z0-9]+';
+  const op = '[*×]';
+  let multiplicand = '';
+  let multiplier = '';
+  let result = '';
+  const partialMap: Record<string, string> = {};
+
+  for (const part of parts) {
+    // RESULT = MULTIPLICAND * MULTIPLIER
+    const altMain = part.match(new RegExp(`^(${word})\\s*=\\s*(${word})\\s*${op}\\s*(${word})$`));
+    // MULTIPLICAND * MULTIPLIER = RESULT
+    const mainForm = part.match(new RegExp(`^(${word})\\s*${op}\\s*(${word})\\s*=\\s*(${word})$`));
+
+    if (altMain && altMain[3].length > 1) {
+      result = altMain[1];
+      multiplicand = altMain[2];
+      multiplier = altMain[3];
+    } else if (mainForm) {
+      if (mainForm[2].length > 1) {
+        multiplicand = mainForm[1];
+        multiplier = mainForm[2];
+        result = mainForm[3];
+      } else {
+        // single digit/letter multiplier → partial product
+        partialMap[mainForm[2]] = mainForm[3];
+      }
+    }
+  }
+
+  if (!multiplicand || !multiplier || !result) return equation;
+
+  // Order partials from right digit to left digit of multiplier
+  const partials: string[] = [];
+  for (let i = multiplier.length - 1; i >= 0; i--) {
+    const digit = multiplier[i];
+    if (partialMap[digit] !== undefined) partials.push(partialMap[digit]);
+  }
+
+  return `${multiplicand} × ${multiplier} | ${partials.join(' + ')} = ${result}`;
+}
+
 export default function SolverMode({ onBack, generatedCryptarithms, isMobile = false, onOpenSidebar }: SolverModeProps) {
   const [equation, setEquation] = useState('');
   const [solvedEquation, setSolvedEquation] = useState(''); // équation confirmée par le serveur
+  const [solvedCategory, setSolvedCategory] = useState<OperationType>('addition'); // catégorie au moment de la résolution
   const [solving, setSolving] = useState(false);
   const [solutions, setSolutions] = useState<Array<Record<string, number>>>([]);
   const [currentSolutionIndex, setCurrentSolutionIndex] = useState(0);
@@ -130,34 +179,15 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
       if (response.success && response.solutions.length > 0) {
         // Snapshot the equation at the moment the server responds
         setSolvedEquation(equation);
+        setSolvedCategory(selectedCategory);
         // Convert API solutions to the format expected by the UI
-        const convertedSolutions = response.solutions.map(sol => {
-          const assignment: Record<string, number> = {};
-
-          if (sol.assignment.includes('\n')) {
-            const lines = sol.assignment.split('\n');
-            if (lines.length >= 2) {
-              const keys = lines[0].split('|').map(s => s.trim()).filter(s => s);
-              const values = lines[1].split('|').map(s => s.trim()).filter(s => s);
-              keys.forEach((key, i) => {
-                if (values[i] !== undefined) {
-                  assignment[key.toUpperCase()] = parseInt(values[i], 10);
-                }
-              });
-            }
-          } else if (sol.assignment.includes('=')) {
-            sol.assignment.split(',').forEach(pair => {
-              const [letter, digit] = pair.trim().split('=');
-              if (letter && digit) {
-                assignment[letter.toUpperCase()] = parseInt(digit, 10);
-              }
-            });
-          }
-          return assignment;
-        });
+        const convertedSolutions = response.solutions.map(sol =>
+          parseSolutionAssignment(sol.assignment)
+        );
         setSolutions(convertedSolutions);
       } else {
-        setError(response.error || 'Aucune solution trouvée pour ce cryptarithme');
+        const isTimeout = timeLimit > 0 && response.executionTimeMs >= timeLimit * 900;
+        setError(isTimeout ? 'Temps dépassé' : (response.error || 'Aucune solution trouvée pour ce cryptarithme'));
       }
     } catch (err) {
       // Ignore stale errors
@@ -243,20 +273,8 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
         {/* Mobile Header - Only on mobile */}
-        {isMobile && (
-          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onOpenSidebar}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
-                aria-label="Menu"
-              >
-                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Résolution</h1>
-              <div className="w-10 h-10"></div>
-            </div>
-          </div>
+        {isMobile && onOpenSidebar && (
+          <MobilePageHeader title="Résolution" onOpenSidebar={onOpenSidebar} />
         )}
 
         {/* Main Container */}
@@ -520,10 +538,11 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                           {(() => {
                             const equation = solvedEquation;
                             const sizeForDisplay = isMobile ? 'small' : 'medium';
-                            // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
-                            if (equation.includes('&&')) {
-                              // Format CROSS: "AN + ODE = TUT && TA + TEL = SUT && ..."
-                              // Prendre les 3 premières équations et les joindre avec |
+                            if (solvedCategory === 'long-multiplication') {
+                              const converted = convertLongMultiplicationForDisplay(equation);
+                              return <VerticalCryptarithm equation={converted} size={sizeForDisplay} />;
+                            } else if (equation.includes('&&')) {
+                              // Format CROSS: prendre les 3 premières équations ligne de la grille
                               const equations = equation.split('&&').map((eq: string) => eq.trim());
                               const crossEquation = equations.slice(0, 3).join(' | ');
                               return <CrossedCryptarithm equation={crossEquation} size={sizeForDisplay} />;
@@ -545,8 +564,10 @@ export default function SolverMode({ onBack, generatedCryptarithms, isMobile = f
                           {(() => {
                             const equationWithNumbers = getEquationWithNumbers(solutions[currentSolutionIndex]);
                             const sizeForDisplay = isMobile ? 'small' : 'medium';
-                            // Conversion du format API (&&) vers le format du composant (|) pour les opérations croisées
-                            if (equationWithNumbers.includes('&&')) {
+                            if (solvedCategory === 'long-multiplication') {
+                              const converted = convertLongMultiplicationForDisplay(equationWithNumbers);
+                              return <VerticalCryptarithm equation={converted} size={sizeForDisplay} />;
+                            } else if (equationWithNumbers.includes('&&')) {
                               // Format CROSS
                               const equations = equationWithNumbers.split('&&').map((eq: string) => eq.trim());
                               const crossEquation = equations.slice(0, 3).join(' | ');

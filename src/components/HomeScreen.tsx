@@ -1,6 +1,7 @@
 import { BookOpen, Lightbulb, Wand2, Gamepad2, Trophy, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { PrimaryButton } from './ui';
+import { safeParseLocalStorage, calculateLevelFromXP, calculateTotalXPFromStars } from '../utils/storageUtils';
 
 interface HomeScreenProps {
   onNavigate: (screen: 'tutorial' | 'solver' | 'generator' | 'game' | 'progress') => void;
@@ -10,17 +11,15 @@ interface HomeScreenProps {
 export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreenProps) {
   const [completedLevels, setCompletedLevels] = useState<number>(0);
   const [totalScore, setTotalScore] = useState<number>(0);
+  const [xpProgress, setXpProgress] = useState<{ level: number; currentLevelXP: number; nextLevelXP: number; progress: number }>({
+    level: 1, currentLevelXP: 0, nextLevelXP: 100, progress: 0,
+  });
 
   useEffect(() => {
-    const completed = localStorage.getItem('completedLevels');
-    if (completed) {
-      setCompletedLevels(JSON.parse(completed).length);
-    }
-
-    const score = localStorage.getItem('totalScore');
-    if (score) {
-      setTotalScore(Number(score));
-    }
+    setCompletedLevels(safeParseLocalStorage<number[]>('completedLevels', []).length);
+    setTotalScore(Number(localStorage.getItem('totalScore') ?? 0));
+    const starsObj = safeParseLocalStorage<Record<number, number>>('levelStars', {});
+    setXpProgress(calculateLevelFromXP(calculateTotalXPFromStars(starsObj)));
   }, []);
 
   return (
@@ -133,14 +132,24 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[13px] text-[#86868B]">Score total</span>
-                    <span className="text-[14px] font-semibold text-[#1D1D1F]">{totalScore}/1000</span>
+                    <span className="text-[14px] font-semibold text-[#1D1D1F]">{totalScore}</span>
+                  </div>
+                </div>
+
+                {/* XP / Niveau */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] text-[#86868B]">Niveau {xpProgress.level}</span>
+                    <span className="text-[14px] font-semibold text-[#1D1D1F]">
+                      {xpProgress.currentLevelXP} / {xpProgress.nextLevelXP} XP
+                    </span>
                   </div>
                   <div className="h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ 
-                        width: `${(totalScore / 1000) * 100}%`,
-                        backgroundColor: '#0096BC'
+                      style={{
+                        width: `${xpProgress.progress}%`,
+                        backgroundColor: '#0096BC',
                       }}
                     />
                   </div>

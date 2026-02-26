@@ -1,21 +1,22 @@
 import { Home, BookOpen, Lightbulb, Gamepad2, Wand2, Trophy, ChevronLeft, Globe } from 'lucide-react';
 import { useState } from 'react';
 import LanguageSelector from './LanguageSelector';
-import { getTranslations } from '../utils/translations';
+import { Language, getTranslations } from '../utils/translations';
+import type { Screen } from '../types';
 
-type SidebarScreen = 'home' | 'tutorial' | 'solver' | 'game' | 'generator' | 'progress';
+type SidebarScreen = Screen;
 
-interface Mobile2048SidebarProps {
+interface MobileSidebarProps {
   currentScreen: SidebarScreen;
   onNavigate: (screen: SidebarScreen) => void;
   tutorialCompleted: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  language: 'fr' | 'en';
-  onLanguageChange: (language: 'fr' | 'en') => void;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
 }
 
-export default function Mobile2048Sidebar({ 
+export default function MobileSidebar({ 
   currentScreen, 
   onNavigate, 
   tutorialCompleted, 
@@ -23,7 +24,7 @@ export default function Mobile2048Sidebar({
   onToggleExpand, 
   language, 
   onLanguageChange 
-}: Mobile2048SidebarProps) {
+}: MobileSidebarProps) {
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const t = getTranslations(language);
   

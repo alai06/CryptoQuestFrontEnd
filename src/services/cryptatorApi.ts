@@ -236,21 +236,6 @@ export async function cancelTask(taskId: string): Promise<boolean> {
     }
 }
 
-/**
- * Check if the cryptator API is running
- * @returns Promise<boolean> - true if API is reachable
- */
-export async function checkApiHealth(): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/cryptator/health`, {
-            method: 'GET',
-        });
-        return response.ok;
-    } catch {
-        return false;
-    }
-}
-
 // ==================== Rate Limiting Functions ====================
 
 /**

@@ -209,9 +209,9 @@ export class RateLimiter {
       }
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Gérer les erreurs 429 (Too Many Requests) avec retry
-      if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+      if (error instanceof Error && (error.message?.includes('429') || error.message?.includes('Too Many Requests'))) {
         if (retryCount < this.config.maxRetries) {
           const delay = this.config.retryDelayBase * Math.pow(2, retryCount);
           await this.sleep(delay);
@@ -263,8 +263,8 @@ export class RateLimiter {
       try {
         const result = await request.execute();
         request.resolve(result);
-      } catch (error: any) {
-        request.reject(error);
+      } catch (error: unknown) {
+        request.reject(error instanceof Error ? error : new Error(String(error)));
       }
     }
 
@@ -358,6 +358,6 @@ export const rateLimiter = new RateLimiter();
 /**
  * Crée une clé de cache pour une requête
  */
-export function createCacheKey(endpoint: string, params: any): string {
+export function createCacheKey(endpoint: string, params: Record<string, unknown>): string {
   return `${endpoint}:${JSON.stringify(params)}`;
 }

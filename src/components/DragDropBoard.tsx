@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
-import { getLetterConstraints, getDigitConstraints, isValidEasyModeAssignment, getGameState, validateSolution } from '../utils/cryptarithmSolver';
+import { getLetterConstraints, getDigitConstraints, isValidEasyModeAssignment, validateSolution } from '../utils/cryptarithmSolver';
 import { PrimaryButton, AlertBanner } from './ui';
 
 // ===== TAILLE FIXE DES CARTES LETTRES (PC) =====
@@ -113,14 +113,6 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
 
     setLetterDomains(newDomains);
   }, [assignments, equation, verificationEliminated]);
-
-  // Use cached game state
-  useEffect(() => {
-    const numAssignments = Object.fromEntries(
-      Object.entries(assignments).map(([k, v]) => [k, Number(v)])
-    );
-    getGameState(equation, numAssignments);
-  }, [equation, assignments]);
 
   useEffect(() => {
     const used = new Set(Object.values(assignments));
@@ -570,24 +562,16 @@ export default function DragDropBoard({ equation, solution, onSolved, onVerifica
       return;
     }
 
-    // Debug logging
-    console.log('=== VERIFICATION DEBUG ===');
-    console.log('Solution complète:', solution);
-    console.log('Assignments actuels:', assignments);
-
     // Check each assignment
     Object.entries(assignments).forEach(([letter, digit]) => {
       // Check if solution exists for this letter
       if (!(letter in solution)) {
-        console.warn(`Lettre ${letter} non trouvée dans la solution!`);
         return;
       }
 
       // Convert both to string for comparison to ensure type consistency
       const correctValue = String(solution[letter]);
       const assignedValue = String(digit);
-      
-      console.log(`Lettre ${letter}: correct=${correctValue}, assigné=${assignedValue}, match=${correctValue === assignedValue}`);
       
       const isCorrect = correctValue === assignedValue;
       

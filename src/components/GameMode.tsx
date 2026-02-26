@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Star, Timer, ChevronRight, ChevronDown, Lock, Menu, Plus, X, Loader, Check } from 'lucide-react';
+import { ArrowLeft, Trophy, Star, Timer, ChevronRight, ChevronDown, Lock, Plus, X, Loader, Check } from 'lucide-react';
+import MobilePageHeader from './MobilePageHeader';
 import DragDropBoard from './DragDropBoard';
 import { solveCryptarithm } from '../services/cryptatorApi';
+import { parseSolutionAssignmentAsStrings, safeParseLocalStorage } from '../utils/storageUtils';
 
 // ===== LARGEUR MAXIMALE DE LA ZONE DE JEU (PC) =====
 const GAME_MAX_WIDTH = 1250; // px — modifier ce nombre pour changer la largeur de la zone de jeu
@@ -30,6 +32,19 @@ interface SavedCryptarithm {
   timestamp: string;
 }
 
+// Niveaux intégrés — solutions résolues via l'API au premier lancement et mises en cache
+const BUILTIN_LEVELS_CONFIG: Array<{
+  id: number;
+  name: string;
+  equation: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timeLimit: number;
+}> = [
+  { id: 1, name: 'Classique I',   equation: 'SEND + MORE = MONEY',    difficulty: 'medium', timeLimit: 300 },
+  { id: 2, name: 'Classique II',  equation: 'AZURE + GRAY = GREEN',   difficulty: 'medium', timeLimit: 300 },
+  { id: 3, name: 'Classique III', equation: 'EUROPA * IO = MERCURY',  difficulty: 'hard',   timeLimit: 600 },
+];
+
 export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenSidebar }: GameModeProps) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [completedLevels, setCompletedLevels] = useState<Set<number>>(new Set());
@@ -39,6 +54,7 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
   const [levelStars, setLevelStars] = useState<Record<number, number>>({});
   const [gameLevels, setGameLevels] = useState<Level[]>([]);
   const [completedCryptarithms, setCompletedCryptarithms] = useState<Level[]>([]);
+  const [builtinLoading, setBuiltinLoading] = useState(true);
   
   // États pour le cryptarithme personnalisé
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -117,90 +133,76 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
     'Puzzle Stellaire', 'Défi Galactique', 'Mystère Cosmique', 'Énigme Sidérale'
   ];
 
-  // Charger les cryptarithmes générés depuis localStorage
+  // Charger les cryptarithmes générés et les niveaux intégrés
   useEffect(() => {
-    const loadGeneratedCryptarithms = () => {
-      const saved = localStorage.getItem('generatedCryptarithms');
-      if (saved) {
-        try {
-          const parsed: SavedCryptarithm[] = JSON.parse(saved);
-          
-          // Convertir les cryptarithmes sauvegardés en niveaux
-          const levels: Level[] = parsed
-            .filter(crypto => {
-              // Filtrer seulement ceux qui ont une solution (format tableau)
-              return crypto.solution && crypto.solution.includes('|');
-            })
-            .map((crypto, index) => {
-              // Parser la solution (format: " E| F| N|\n 9| 7| 1|")
-              const solutionMap: Record<string, string> = {};
-              const lines = crypto.solution.split('\n').map(l => l.trim());
-              
-              if (lines.length === 2) {
-                const letters = lines[0].split('|').map(s => s.trim()).filter(s => s.length > 0);
-                const values = lines[1].split('|').map(s => s.trim()).filter(s => s.length > 0);
-                
-                for (let i = 0; i < letters.length && i < values.length; i++) {
-                  if (letters[i] && values[i]) {
-                    solutionMap[letters[i]] = values[i];
-                  }
-                }
-              }
-              
-              // Vérifier que la solution a bien été parsée (au moins une lettre)
-              if (Object.keys(solutionMap).length === 0) {
-                return null;
-              }
-              
-              return {
-                id: 1000 + index, // ID unique pour les niveaux générés
-                name: cryptarithmNames[index % cryptarithmNames.length],
-                equation: crypto.equation,
-                solution: solutionMap,
-                timeLimit: 300,
-                difficulty: 'medium',
-              } as Level;
-            })
-            .filter((level): level is Level => level !== null);
-          
-          setGameLevels(levels);
-        } catch (error) {
-          console.error('Erreur lors du chargement des cryptarithmes:', error);
-          setGameLevels([]);
+    const loadAll = async () => {
+      setBuiltinLoading(true);
+
+      // 1. Niveaux générés depuis localStorage
+      const parsed = safeParseLocalStorage<SavedCryptarithm[]>('generatedCryptarithms', []);
+      const generatedLevels: Level[] = parsed
+        .filter(crypto => crypto.solution && crypto.solution.includes('|'))
+        .map((crypto, index) => {
+          const solutionMap = parseSolutionAssignmentAsStrings(crypto.solution);
+          if (Object.keys(solutionMap).length === 0) return null;
+          return {
+            id: 1000 + index,
+            name: cryptarithmNames[index % cryptarithmNames.length],
+            equation: crypto.equation,
+            solution: solutionMap,
+            timeLimit: 300,
+            difficulty: 'medium',
+          } as Level;
+        })
+        .filter((level): level is Level => level !== null);
+
+      // 2. Niveaux intégrés — solutions depuis le cache ou résolues via API
+      const cachedSolutions = safeParseLocalStorage<Record<number, Record<string, string>>>('builtinLevelSolutions', {});
+      const builtinLevels: Level[] = [];
+      let cacheUpdated = false;
+
+      for (const config of BUILTIN_LEVELS_CONFIG) {
+        let solution = cachedSolutions[config.id];
+
+        if (!solution || Object.keys(solution).length === 0) {
+          try {
+            const response = await solveCryptarithm({
+              cryptarithm: config.equation,
+              solverType: 'SCALAR',
+              solutionLimit: 1,
+              timeLimit: 30,
+            });
+            if (response.success && response.solutions.length > 0) {
+              solution = parseSolutionAssignmentAsStrings(response.solutions[0].assignment);
+              cachedSolutions[config.id] = solution;
+              cacheUpdated = true;
+            }
+          } catch {
+            // API indisponible — ce niveau sera affiché une fois l'API accessible
+          }
         }
-      } else {
-        setGameLevels([]);
+
+        if (solution && Object.keys(solution).length > 0) {
+          builtinLevels.push({ ...config, solution });
+        }
       }
+
+      if (cacheUpdated) {
+        localStorage.setItem('builtinLevelSolutions', JSON.stringify(cachedSolutions));
+      }
+
+      setGameLevels([...builtinLevels, ...generatedLevels]);
+      setBuiltinLoading(false);
     };
-    
-    loadGeneratedCryptarithms();
-    
-    // Charger les cryptarithmes terminés
-    const savedCompleted = localStorage.getItem('completedCryptarithms');
-    if (savedCompleted) {
-      try {
-        setCompletedCryptarithms(JSON.parse(savedCompleted));
-      } catch (error) {
-        console.error('Erreur lors du chargement des cryptarithmes terminés:', error);
-      }
-    }
+
+    loadAll();
+    setCompletedCryptarithms(safeParseLocalStorage<Level[]>('completedCryptarithms', []));
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('completedLevels');
-    if (saved) {
-      setCompletedLevels(new Set(JSON.parse(saved)));
-    }
-
-    const savedStars = localStorage.getItem('levelStars');
-    if (savedStars) {
-      setLevelStars(JSON.parse(savedStars));
-    }
-
-    const savedScore = localStorage.getItem('totalScore');
-    if (savedScore) {
-      setScore(Number(savedScore));
-    }
+    setCompletedLevels(new Set(safeParseLocalStorage<number[]>('completedLevels', [])));
+    setLevelStars(safeParseLocalStorage<Record<number, number>>('levelStars', {}));
+    setScore(Number(localStorage.getItem('totalScore') ?? 0));
   }, []);
 
   useEffect(() => {
@@ -308,37 +310,8 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
 
       // Si on arrive ici, le cryptarithme a exactement 1 solution
       const solution = response.solutions[0];
-      const solutionMap: Record<string, string> = {};
+      const solutionMap = parseSolutionAssignmentAsStrings(solution.assignment);
       
-      console.log('=== PARSING SOLUTION FROM API ===');
-      console.log('Response complète:', response);
-      console.log('Solution brute:', solution);
-      console.log('Assignment string:', solution.assignment);
-      
-      // Parser la solution (format de l'API: " E| F| N|\n 9| 7| 1|")
-      // La première ligne contient les lettres, la deuxième ligne les valeurs
-      const lines = solution.assignment.split('\n').map(l => l.trim());
-      console.log('Lignes après split:', lines);
-      
-      if (lines.length === 2) {
-        // Extraire les lettres et valeurs en utilisant le séparateur "|"
-        const letters = lines[0].split('|').map(s => s.trim()).filter(s => s.length > 0);
-        const values = lines[1].split('|').map(s => s.trim()).filter(s => s.length > 0);
-        
-        console.log('Lettres extraites:', letters);
-        console.log('Valeurs extraites:', values);
-        
-        // Créer le mapping lettre -> valeur
-        for (let i = 0; i < letters.length && i < values.length; i++) {
-          if (letters[i] && values[i]) {
-            solutionMap[letters[i]] = values[i];
-            console.log(`Ajout dans solutionMap: ${letters[i]} = ${values[i]}`);
-          }
-        }
-      }
-      
-      console.log('SolutionMap final:', solutionMap);
-
       // Créer un niveau personnalisé
       const customLevel: Level = {
         id: 999, // ID spécial pour les niveaux personnalisés
@@ -349,8 +322,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
         difficulty: 'medium',
       };
       
-      console.log('CustomLevel créé:', customLevel);
-
       // Lancer le jeu avec ce niveau
       setShowCustomModal(false);
       setCustomCryptarithm('');
@@ -364,6 +335,8 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
 
   const handleDeleteCryptarithm = (levelId: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Les niveaux intégrés (id <= 10) ne peuvent pas être supprimés
+    if (levelId <= 10) return;
     
     // Retirer de la liste des niveaux
     const updatedLevels = gameLevels.filter(level => level.id !== levelId);
@@ -568,20 +541,8 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-5xl mx-auto">
         {/* Mobile Header - Only on mobile */}
-        {isMobile && (
-          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onOpenSidebar}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
-                aria-label="Menu"
-              >
-                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Mode Aventure</h1>
-              <div className="w-10 h-10"></div>
-            </div>
-          </div>
+        {isMobile && onOpenSidebar && (
+          <MobilePageHeader title="Mode Aventure" onOpenSidebar={onOpenSidebar} />
         )}
 
         {/* Header */}
@@ -707,7 +668,12 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
           )}
 
           <div className="space-y-4">
-            {gameLevels.filter(level => !completedCryptarithms.some(c => c.id === level.id)).length === 0 ? (
+            {builtinLoading ? (
+              <div className="flex items-center justify-center gap-3 p-8 text-[#86868B]">
+                <Loader className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                <span className="text-[14px]">Chargement des niveaux...</span>
+              </div>
+            ) : gameLevels.filter(level => !completedCryptarithms.some(c => c.id === level.id)).length === 0 ? (
               <div className="bg-[#F5F5F7] border border-[#E5E5E5] rounded-[12px] p-8 text-center">
                 <p className="text-[#86868B] text-[14px] mb-4">
                   Aucun cryptarithme disponible pour le moment.
@@ -766,7 +732,8 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
                         </div>
                       )}
 
-                      {/* Bouton de suppression */}
+                      {/* Bouton de suppression — masqué pour les niveaux intégrés */}
+                      {level.id > 10 && (
                       <button
                         onClick={(e) => handleDeleteCryptarithm(level.id, e)}
                         className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#0096BC]/10 hover:bg-[#0096BC]/20 flex items-center justify-center transition-colors group flex-shrink-0"
@@ -774,6 +741,7 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
                       >
                         <X className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] group-hover:scale-110 transition-transform" strokeWidth={1.5} />
                       </button>
+                      )}
 
                       {isUnlocked && <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-[#0096BC] flex-shrink-0" strokeWidth={1.5} />}
                     </div>

@@ -1,7 +1,6 @@
 import { Home, BookOpen, Lightbulb, Wand2, Gamepad2, Trophy } from 'lucide-react';
 import logoImage from 'figma:asset/25e7f8718e6c894ac22128cb8f9b55c07e5536c0.png';
-
-type Screen = 'home' | 'tutorial' | 'solver' | 'generator' | 'game' | 'progress';
+import type { Screen } from '../types';
 
 interface NavigationMenuProps {
   currentScreen: Screen;

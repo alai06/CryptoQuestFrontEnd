@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Menu, Loader } from 'lucide-react';
+import { Wand2, Plus, X, Download, Grid3x3, Trash2, AlertCircle, Loader } from 'lucide-react';
+import MobilePageHeader from './MobilePageHeader';
 import { generateCryptarithms as generateCryptarithmsAPI, getApiLimits, cancelTask } from '../services/cryptatorApi';
+import { safeParseLocalStorage } from '../utils/storageUtils';
 import VerticalCryptarithm from './VerticalCryptarithm';
 import CrossedCryptarithm from './CrossedCryptarithm';
 import BackButtonWithProgress from './BackButtonWithProgress';
@@ -33,6 +35,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const currentTaskIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const generateGenerationRef = useRef<number>(0);
+  const clientTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Generation mode
   const [generationMode, setGenerationMode] = useState<'manual' | 'doubly-true'>('manual');
@@ -57,17 +60,9 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
 
     // Charger les cryptarithmes sauvegardés au démarrage
   useEffect(() => {
-    const saved = localStorage.getItem('generatedCryptarithms');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setGenerated(parsed.map((c: any) => ({
-          ...c,
-          timestamp: new Date(c.timestamp),
-        })));
-      } catch (error) {
-        console.error('Erreur lors du chargement des cryptarithmes:', error);
-      }
+    const parsed = safeParseLocalStorage<Array<GeneratedCryptarithm & { timestamp: string }>>('generatedCryptarithms', []);
+    if (parsed.length > 0) {
+      setGenerated(parsed.map((c) => ({ ...c, timestamp: new Date(c.timestamp) })));
     }
   }, []);
 
@@ -82,6 +77,10 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   useEffect(() => {
     return () => {
       generateGenerationRef.current++;
+      if (clientTimeoutRef.current) {
+        clearTimeout(clientTimeoutRef.current);
+        clientTimeoutRef.current = null;
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -138,6 +137,14 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     abortControllerRef.current = controller;
     const currentGeneration = ++generateGenerationRef.current;
 
+    let isClientTimeout = false;
+    if (timeLimit > 0) {
+      clientTimeoutRef.current = setTimeout(() => {
+        isClientTimeout = true;
+        controller.abort();
+      }, timeLimit * 1000);
+    }
+
     setGenerating(true);
     setError('');
     setIsCancelHovered(false);
@@ -183,14 +190,16 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
           onCryptarithmGenerated(newCryptarithms[0].equation, {});
         }
       } else {
-        setError(response.error || 'Aucun cryptarithme généré');
+        const isTimeout = timeLimit > 0 && response.executionTimeMs >= timeLimit * 900;
+        setError(isTimeout ? 'Temps dépassé' : (response.error || 'Aucun cryptarithme généré'));
       }
     } catch (err) {
       // Ignore stale errors
       if (currentGeneration !== generateGenerationRef.current) return;
 
-      // AbortError means user cancelled — don't show any error
+      // AbortError: either user cancelled or client-side timeout
       if (err instanceof DOMException && err.name === 'AbortError') {
+        if (isClientTimeout) setError('Temps dépassé');
         return;
       }
 
@@ -199,6 +208,10 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
         setError(errMsg);
       }
     } finally {
+      if (clientTimeoutRef.current) {
+        clearTimeout(clientTimeoutRef.current);
+        clientTimeoutRef.current = null;
+      }
       if (currentGeneration === generateGenerationRef.current) {
         setGenerating(false);
         setIsCancelHovered(false);
@@ -211,6 +224,12 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
   const handleCancelGenerate = async () => {
     // Bump generation so the in-flight response is ignored
     generateGenerationRef.current++;
+
+    // Clear client-side timeout if active
+    if (clientTimeoutRef.current) {
+      clearTimeout(clientTimeoutRef.current);
+      clientTimeoutRef.current = null;
+    }
 
     // Abort the fetch request immediately
     if (abortControllerRef.current) {
@@ -299,20 +318,8 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
     <div className="min-h-screen px-8 py-16 pt-24">
       <div className="max-w-6xl mx-auto">
         {/* Mobile Header - Only on mobile */}
-        {isMobile && (
-          <div className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] z-40 px-5 py-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onOpenSidebar}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00AFD7] to-[#007EA1] flex items-center justify-center active:scale-95 transition-transform shadow-lg"
-                aria-label="Menu"
-              >
-                <Menu className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </button>
-              <h1 className="text-[18px] font-bold text-[#1D1D1F]">Génération</h1>
-              <div className="w-10 h-10"></div>
-            </div>
-          </div>
+        {isMobile && onOpenSidebar && (
+          <MobilePageHeader title="Génération" onOpenSidebar={onOpenSidebar} />
         )}
 
         {/* Configuration Panel */}
@@ -383,7 +390,7 @@ export default function GeneratorMode({ onBack, onCryptarithmGenerated, isMobile
                 ].map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
-                    onClick={() => setOperation(value as any)}
+                    onClick={() => setOperation(value as 'addition' | 'multiplication' | 'crossed' | 'long-multiplication')}
                     className={`
                       w-full flex items-center gap-3 px-3 py-2 rounded-[12px] transition-all text-[14px] font-medium
                       ${operation === value
