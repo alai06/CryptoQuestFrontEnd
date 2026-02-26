@@ -419,7 +419,6 @@ export default function GameMode({ onBack, onNavigate, isMobile = false, onOpenS
                   </div>
                   {calculateCurrentStars() === 4 && (
                     <p className="text-xs md:text-[13px] text-[#34C759] font-medium mt-2">
-                      🌟 Parfait ! Continuez !
                     </p>
                   )}
                   {calculateCurrentStars() < 4 && getVerificationsUntilStarLoss() !== null && getVerificationsUntilStarLoss()! > 0 && (
