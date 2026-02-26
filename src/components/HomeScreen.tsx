@@ -158,7 +158,7 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
                 {/* Niveaux */}
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#86868B]">Niveaux</span>
+                    <span className="text-[13px] text-[#86868B]">Cryptarithmes complétés</span>
                     <span className="text-[14px] font-semibold text-[#1D1D1F]">{completedLevels}</span>
                   </div>
                 </div>
@@ -184,7 +184,7 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
               
               <h3 className="text-[16px] font-semibold text-white mb-2">Mode Jeu</h3>
               <p className="text-[14px] text-white/80 leading-relaxed mb-4">
-                5 niveaux de difficulté croissante avec système de scoring
+                Jouez sur des cryptarithmes pré-construits et générés avec un système de score.
               </p>
               
               <div className="flex items-center gap-2 text-white">
