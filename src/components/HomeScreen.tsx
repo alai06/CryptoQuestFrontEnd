@@ -184,7 +184,7 @@ export default function HomeScreen({ onNavigate, tutorialCompleted }: HomeScreen
               
               <h3 className="text-[16px] font-semibold text-white mb-2">Mode Jeu</h3>
               <p className="text-[14px] text-white/80 leading-relaxed mb-4">
-                Jouez sur des cryptarithmes pré-construits et générés avec un système de score.
+                Jouez sur des cryptarithmes pré-construits ou générés avec un système de score.
               </p>
               
               <div className="flex items-center gap-2 text-white">
