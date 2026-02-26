@@ -15,7 +15,7 @@ CryptoQuest est une application web interactive dédiée aux cryptarithmes - des
 
 ---
 
-## 📋 Table des matières
+##  Table des matières
 
 - [Présentation](#-présentation)
 - [Fonctionnalités](#-fonctionnalités)
@@ -29,7 +29,7 @@ CryptoQuest est une application web interactive dédiée aux cryptarithmes - des
 
 ---
 
-## 🎯 Présentation
+##  Présentation
 
 Les **cryptarithmes** (ou cryptarithmétiques) sont des puzzles mathématiques où les chiffres d'une opération arithmétique sont remplacés par des lettres. Le défi consiste à retrouver quelle lettre correspond à quel chiffre, sachant que :
 - Chaque lettre représente un chiffre unique (0-9)
@@ -42,9 +42,9 @@ CryptoQuest propose une interface moderne et intuitive pour explorer ces puzzles
 
 ---
 
-## ✨ Fonctionnalités
+##  Fonctionnalités
 
-### 🎮 Modes de jeu
+###  Modes de jeu
 
 1. **Mode Tutoriel**
    - Introduction progressive aux concepts des cryptarithmes
@@ -78,7 +78,7 @@ CryptoQuest propose une interface moderne et intuitive pour explorer ces puzzles
    - Badges et récompenses
    - Historique des performances
 
-### 🌍 Fonctionnalités générales
+###  Fonctionnalités générales
 
 - **Interface bilingue** : Français et Anglais
 - **Design responsive** : Compatible mobile, tablette et desktop
@@ -91,7 +91,7 @@ CryptoQuest propose une interface moderne et intuitive pour explorer ces puzzles
 
 ---
 
-## 🛠 Technologies utilisées
+##  Technologies utilisées
 
 ### Frontend
 
@@ -112,7 +112,7 @@ CryptoQuest propose une interface moderne et intuitive pour explorer ces puzzles
 
 ---
 
-## � Lancer l'application
+##  Lancer l'application
 
 ### Utiliser l'application en ligne
 
@@ -148,7 +148,7 @@ Pour lancer le backend localement, consultez le README du dépôt backend :
 
 ---
 
-## 📁 Architecture
+##  Architecture
 
 ### Structure du projet
 
@@ -249,7 +249,7 @@ CryptoQuestFrontEnd/
 
 ---
 
-## 🔌 API Backend
+##  API Backend
 
 CryptoQuest Frontend communique avec une API backend pour la résolution et la génération de cryptarithmes.
 
@@ -328,13 +328,13 @@ Le frontend implémente un système de rate limiting pour protéger l'API :
 
 ---
 
-## 📄 Licence
+##  Licence
 
 Ce projet est sous licence **MIT**. 
 
 ---
 
-## 👥 Auteurs
+##  Auteurs
 
 - **Alexis DUBARRY**
 - **Florent BELOT**
@@ -343,7 +343,7 @@ Ce projet est sous licence **MIT**.
 
 ---
 
-## 🙏 Remerciements
+##  Remerciements
 
 Nous souhaitons à remercier notre tuteur M. Arnaud MALAPERT, qui nous a suivi durant tout le projet et qui est l'auteur de Cryptator sur lequel nous avons basé notre application
 
